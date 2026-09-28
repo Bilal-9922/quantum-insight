@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.pytest_cache/
+backend/quantuminsight.db
+node_modules/
+.next/
+out/
+*.log
+.venv-1/

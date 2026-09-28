@@ -1,0 +1,1 @@
+export default function History(){return <div className="space-y-4"><h1 className="text-3xl font-bold">Analysis History</h1><div className="card"><p className="text-slate-400">SQLite history schema is prepared in the backend architecture. This MVP keeps the core analysis stateless; persistent history can be enabled next.</p></div></div>}
