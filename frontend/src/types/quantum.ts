@@ -19,20 +19,25 @@ export type Analysis = {
   parser: string;
   metrics: Metrics;
   circuit: Circuit;
+
   health: {
     score: number;
     category: string;
     components: Record<string, number>;
   };
+
   anomaly: {
     anomaly: boolean;
     score: number;
   };
+
   noise: Record<string, unknown>;
+
   recommendations: {
     summary: string;
     recommendations: string[];
     provider: string;
   };
+
   explanation: string;
 };
