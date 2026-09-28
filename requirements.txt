@@ -1,0 +1,2 @@
+# Convenience root requirements; backend has its own pinned-ish requirements.
+-r backend/requirements.txt
