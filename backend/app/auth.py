@@ -99,6 +99,92 @@ def create_token(user):
     payload = {"sub": str(user["id"]), "email": user["email"], "exp": now + timedelta(days=TOKEN_DAYS)}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+def create_password_reset_token(user_id: int):
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=RESET_TOKEN_MINUTES)
+
+    conn = _connect()
+    conn.execute(
+        "UPDATE password_resets SET used=1 WHERE user_id=? AND used=0",
+        (user_id,),
+    )
+    conn.execute(
+        """
+        INSERT INTO password_resets
+        (user_id, token_hash, expires_at, used, created_at)
+        VALUES (?, ?, ?, 0, ?)
+        """,
+        (
+            user_id,
+            token_hash,
+            expires_at.isoformat(),
+            now.isoformat(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    return raw_token
+
+
+def reset_password(token: str, new_password: str):
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    conn = _connect()
+    row = conn.execute(
+        """
+        SELECT *
+        FROM password_resets
+        WHERE token_hash=?
+          AND used=0
+        """,
+        (token_hash,),
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired password reset link.",
+        )
+
+    expires_at = datetime.fromisoformat(row["expires_at"])
+
+    if datetime.now(timezone.utc) >= expires_at:
+        conn.close()
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired password reset link.",
+        )
+
+    password_hash, salt = _hash_password(new_password)
+
+    conn.execute(
+        """
+        UPDATE users
+        SET password_hash=?, salt=?
+        WHERE id=?
+        """,
+        (password_hash, salt, row["user_id"]),
+    )
+
+    conn.execute(
+        """
+        UPDATE password_resets
+        SET used=1
+        WHERE id=?
+        """,
+        (row["id"],),
+    )
+
+    conn.commit()
+    conn.close()
+
+    return True
+
 
 def current_user(authorization: str | None = Header(default=None)):
     if not authorization or not authorization.lower().startswith("bearer "):
