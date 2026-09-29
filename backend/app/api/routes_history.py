@@ -1,0 +1,43 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from app.auth import current_user
+from app.core.supabase import supabase
+
+
+router = APIRouter(tags=["history"])
+security = HTTPBearer()
+
+
+def authenticated_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    return current_user(f"Bearer {credentials.credentials}")
+
+
+@router.get("/history")
+def get_history(
+    limit: int = Query(default=20, ge=1, le=100),
+    user=Depends(authenticated_user),
+):
+    try:
+        result = (
+            supabase
+            .table("analysis_history")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "count": len(result.data or []),
+            "history": result.data or [],
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load analysis history: {str(e)}",
+        )
