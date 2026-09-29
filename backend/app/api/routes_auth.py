@@ -1,11 +1,13 @@
 import os
 import re
+import sqlite3
 
 import resend
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.auth import (
+    DB_PATH,
     authenticate,
     create_password_reset_token,
     create_token,
@@ -16,61 +18,94 @@ from app.auth import (
 )
 
 router = APIRouter(tags=["authentication"])
+
 init_auth_db()
+
 
 class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: str
     password: str = Field(min_length=8, max_length=128)
 
+
 class LoginRequest(BaseModel):
     email: str
     password: str
 
+
 class ForgotPasswordRequest(BaseModel):
     email: str
+
 
 class ResetPasswordRequest(BaseModel):
     token: str
     password: str = Field(min_length=8, max_length=128)
 
+
 @router.post("/auth/register")
 def register(req: RegisterRequest):
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", req.email.strip()):
-        raise HTTPException(status_code=422, detail="Enter a valid email address.")
-    user = register_user(req.name, req.email, req.password)
-    return {"user": user, "token": create_token(user)}
+        raise HTTPException(
+            status_code=422,
+            detail="Enter a valid email address.",
+        )
+
+    user = register_user(
+        req.name,
+        req.email,
+        req.password,
+    )
+
+    return {
+        "user": user,
+        "token": create_token(user),
+    }
+
 
 @router.post("/auth/login")
 def login(req: LoginRequest):
-    user = authenticate(req.email, req.password)
-    return {"user": user, "token": create_token(user)}
+    user = authenticate(
+        req.email,
+        req.password,
+    )
+
+    return {
+        "user": user,
+        "token": create_token(user),
+    }
+
 
 @router.get("/auth/me")
 def me(user=Depends(current_user)):
-    return {"user": user}
+    return {
+        "user": user,
+    }
+
 
 @router.post("/auth/forgot-password")
 def forgot_password(req: ForgotPasswordRequest):
     email = req.email.strip().lower()
 
-    import sqlite3
-    from app.auth import DB_PATH
-
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    user = conn.execute(
-        "SELECT * FROM users WHERE email=?",
-        (email,),
-    ).fetchone()
-    conn.close()
+
+    try:
+        user = conn.execute(
+            "SELECT * FROM users WHERE email=?",
+            (email,),
+        ).fetchone()
+    finally:
+        conn.close()
 
     # Always return the same response so attackers cannot
     # discover whether an email is registered.
     if not user:
         return {
             "success": True,
-            "message": "If an account exists for this email, a reset link has been sent.",
+            "message": (
+                "If an account exists for this email, "
+                "a reset link has been sent."
+            ),
         }
 
     token = create_password_reset_token(user["id"])
@@ -80,7 +115,9 @@ def forgot_password(req: ForgotPasswordRequest):
         "http://localhost:3000",
     ).rstrip("/")
 
-    reset_url = f"{frontend_url}/reset-password?token={token}"
+    reset_url = (
+        f"{frontend_url}/reset-password?token={token}"
+    )
 
     resend.api_key = os.getenv("RESEND_API_KEY")
 
@@ -90,7 +127,7 @@ def forgot_password(req: ForgotPasswordRequest):
             detail="Email service is not configured.",
         )
 
-       try:
+    try:
         resend.Emails.send(
             {
                 "from": "QuantumInsight <onboarding@resend.dev>",
@@ -103,7 +140,8 @@ def forgot_password(req: ForgotPasswordRequest):
                     <p>Hello {user["name"]},</p>
 
                     <p>
-                        We received a request to reset your QuantumInsight password.
+                        We received a request to reset your
+                        QuantumInsight password.
                     </p>
 
                     <p>
@@ -123,34 +161,50 @@ def forgot_password(req: ForgotPasswordRequest):
                     </p>
 
                     <p>
-                        This link expires in 30 minutes and can only be used once.
+                        This link expires in 30 minutes and can
+                        only be used once.
                     </p>
 
                     <p>
-                        If you did not request this, you can safely ignore this email.
+                        If you did not request this, you can
+                        safely ignore this email.
                     </p>
 
                     <p>— QuantumInsight</p>
                 </div>
-                """ ,
+                """,
             }
         )
 
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to send password reset email: {str(e)}",
-            )
-        return {
-            "success": True,
-            "message": "If an account exists for this email, a reset link has been sent.",
-        }
-
-@router.post("/auth/reset-password")
-def reset_password_endpoint(req: ResetPasswordRequest):
-    reset_password(req.token, req.password)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Failed to send password reset email: "
+                f"{str(e)}"
+            ),
+        )
 
     return {
         "success": True,
-        "message": "Password reset successfully. You can now sign in.",
+        "message": (
+            "If an account exists for this email, "
+            "a reset link has been sent."
+        ),
+    }
+
+
+@router.post("/auth/reset-password")
+def reset_password_endpoint(req: ResetPasswordRequest):
+    reset_password(
+        req.token,
+        req.password,
+    )
+
+    return {
+        "success": True,
+        "message": (
+            "Password reset successfully. "
+            "You can now sign in."
+        ),
     }
