@@ -22,16 +22,23 @@ async function apiRequest(
 
   headers.set("Content-Type", "application/json");
 
-  if (token) {
+  if (!token) {
+    console.error(
+      `[QuantumInsight] No authentication token found for ${path}`
+    );
+  } else {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API}${path}`, {
+  console.log("[QuantumInsight API]", {
+    url: `${API}${path}`,
+    authenticated: Boolean(token),
+  });
+
+  return fetch(`${API}${path}`, {
     ...options,
     headers,
   });
-
-  return response;
 }
 
 async function getErrorMessage(response: Response): Promise<string> {
