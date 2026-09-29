@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 from app.core.security import sanitize_code_input
@@ -24,54 +25,38 @@ from app.noise.simulator import analyze_noise
 router = APIRouter(tags=["analysis"])
 detector = AnomalyDetector()
 
+security = HTTPBearer()
+
 
 class CodeRequest(BaseModel):
     code: str
     language: str = "python"
 
 
+def authenticated_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    return current_user(credentials.credentials)
+
+
 @router.post("/analyze")
-def analyze(req: CodeRequest, user=Depends(current_user)):
+def analyze(
+    req: CodeRequest,
+    user=Depends(authenticated_user),
+):
     try:
-        # -----------------------------
-        # 1. Sanitize and validate code
-        # -----------------------------
         code = sanitize_code_input(req.code)
         validation = validate_python(code)
 
-        # -----------------------------
-        # 2. Parse quantum circuit
-        # -----------------------------
         circuit, mode = parse_qiskit_code(code)
-
-        # -----------------------------
-        # 3. Extract circuit metrics
-        # -----------------------------
         metrics = extract_metrics(circuit)
 
-        # -----------------------------
-        # 4. Calculate Quantum Health
-        # -----------------------------
         health = calculate_qhi(metrics)
-
-        # -----------------------------
-        # 5. ML health prediction
-        # -----------------------------
         model_health = predict_health(health["components"])
 
-        # -----------------------------
-        # 6. Detect anomalies
-        # -----------------------------
         anomaly = detector.predict(metrics)
-
-        # -----------------------------
-        # 7. Analyze noise
-        # -----------------------------
         noise = analyze_noise(metrics)
 
-        # -----------------------------
-        # 8. Build analysis result
-        # -----------------------------
         analysis = {
             "success": True,
             "validation": validation,
@@ -84,19 +69,9 @@ def analyze(req: CodeRequest, user=Depends(current_user)):
             "noise": noise,
         }
 
-        # -----------------------------
-        # 9. Generate recommendations
-        # -----------------------------
         analysis["recommendations"] = recommend(analysis)
-
-        # -----------------------------
-        # 10. Generate explanation
-        # -----------------------------
         analysis["explanation"] = explain(analysis)
 
-        # -----------------------------
-        # 11. Save analysis to Supabase
-        # -----------------------------
         try:
             saved_result = (
                 supabase
@@ -106,9 +81,11 @@ def analyze(req: CodeRequest, user=Depends(current_user)):
                     "metrics": metrics,
                     "health_score": health.get("score"),
                     "health_category": health.get("category"),
-                    "anomaly_score": anomaly.get("score")
-                    if isinstance(anomaly, dict)
-                    else None,
+                    "anomaly_score": (
+                        anomaly.get("score")
+                        if isinstance(anomaly, dict)
+                        else None
+                    ),
                     "recommendations": analysis["recommendations"],
                     "explanation": analysis["explanation"],
                 })
@@ -127,8 +104,6 @@ def analyze(req: CodeRequest, user=Depends(current_user)):
                 }
 
         except Exception as db_error:
-            # Database failure should not prevent the analysis
-            # itself from being returned.
             analysis["database"] = {
                 "saved": False,
                 "error": str(db_error),
@@ -144,10 +119,14 @@ def analyze(req: CodeRequest, user=Depends(current_user)):
 
 
 @router.post("/noise-analysis")
-def noise_analysis(req: CodeRequest, user=Depends(current_user)):
+def noise_analysis(
+    req: CodeRequest,
+    user=Depends(authenticated_user),
+):
     try:
         circuit, _ = parse_qiskit_code(req.code)
         metrics = extract_metrics(circuit)
+
         return analyze_noise(metrics)
 
     except Exception as e:
@@ -158,10 +137,14 @@ def noise_analysis(req: CodeRequest, user=Depends(current_user)):
 
 
 @router.post("/ai/recommend")
-def ai_recommend(req: CodeRequest, user=Depends(current_user)):
+def ai_recommend(
+    req: CodeRequest,
+    user=Depends(authenticated_user),
+):
     try:
         circuit, mode = parse_qiskit_code(req.code)
         metrics = extract_metrics(circuit)
+
         health = calculate_qhi(metrics)
         anomaly = detector.predict(metrics)
 
