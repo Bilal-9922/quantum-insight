@@ -77,6 +77,7 @@ def analyze(
                 supabase
                 .table("analysis_history")
                 .insert({
+                    "user_id": user["id"],
                     "circuit": code,
                     "metrics": metrics,
                     "health_score": health.get("score"),
