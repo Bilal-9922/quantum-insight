@@ -1,6 +1,6 @@
 # QuantumInsight
 
-#LIVE LINK ::: https://quantum-insight.bilalshaikh1339.workers.dev/
+# LIVE LINK ::: https://quantum-insight.bilalshaikh1339.workers.dev/
 
 AI-powered quantum circuit intelligence MVP.
 
