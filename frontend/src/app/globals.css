@@ -656,3 +656,207 @@ textarea:focus {
     padding: 34px 24px;
   }
 }
+
+
+/* =========================================
+   ANALYZER - HEALTH COMPONENT VISIBILITY
+========================================= */
+
+.health-card {
+  position: relative;
+  overflow: hidden;
+
+  color: #edf4ff;
+
+  background:
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(34, 211, 238, 0.08),
+      transparent 30%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(15, 23, 42, 0.92),
+      rgba(6, 12, 28, 0.95)
+    );
+
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+/* Health component headings */
+.health-card h1,
+.health-card h2,
+.health-card h3,
+.health-card h4 {
+  color: #f1f5ff;
+}
+
+/* Health component normal text */
+.health-card p,
+.health-card span,
+.health-card label {
+  color: #aebbd0;
+}
+
+/* Health metric values */
+.health-card .metric-value,
+.health-card .health-value,
+.health-card .score,
+.health-card .health-score {
+  color: #f8fbff !important;
+  font-weight: 800;
+}
+
+/* Health metric labels */
+.health-card .metric-label,
+.health-card .health-label {
+  color: #94a3b8 !important;
+}
+
+/* =========================================
+   HEALTH GRAPH
+========================================= */
+
+.health-card svg {
+  overflow: visible;
+}
+
+/* SVG text / axis labels */
+.health-card svg text {
+  fill: #94a3b8 !important;
+  color: #94a3b8 !important;
+}
+
+/* Graph grid */
+.health-card svg line {
+  stroke: rgba(148, 163, 184, 0.14);
+}
+
+/* Make graph paths visible */
+.health-card svg path {
+  visibility: visible;
+}
+
+/* Graph points */
+.health-card svg circle {
+  visibility: visible;
+}
+
+/* =========================================
+   RECHARTS SUPPORT
+========================================= */
+
+.health-card .recharts-wrapper {
+  color: #cbd5e1;
+}
+
+.health-card .recharts-cartesian-axis-tick-value {
+  fill: #94a3b8 !important;
+}
+
+.health-card .recharts-cartesian-axis-line {
+  stroke: rgba(148, 163, 184, 0.18) !important;
+}
+
+.health-card .recharts-cartesian-grid-horizontal line,
+.health-card .recharts-cartesian-grid-vertical line {
+  stroke: rgba(148, 163, 184, 0.12) !important;
+}
+
+.health-card .recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.health-card .recharts-default-tooltip {
+  color: #f1f5ff !important;
+
+  background: rgba(7, 13, 31, 0.96) !important;
+
+  border: 1px solid rgba(148, 163, 184, 0.18) !important;
+  border-radius: 10px !important;
+
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35);
+}
+
+.health-card .recharts-tooltip-label {
+  color: #f1f5ff !important;
+}
+
+.health-card .recharts-tooltip-item {
+  color: #cbd5e1 !important;
+}
+
+/* =========================================
+   HEALTH SCORE / STATUS
+========================================= */
+
+.health-score {
+  color: #f8fbff !important;
+}
+
+.health-status {
+  color: #67e8f9 !important;
+}
+
+.health-description {
+  color: #94a3b8 !important;
+}
+
+/* =========================================
+   HEALTH PROGRESS BARS
+========================================= */
+
+.health-card progress {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.health-card .progress-track {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.health-card .progress-bar {
+  background: linear-gradient(
+    90deg,
+    #22d3ee,
+    #4f8cff,
+    #a855f7
+  ) !important;
+}
+
+/* =========================================
+   HEALTH BADGES
+========================================= */
+
+.health-card .badge {
+  color: #dce8fb;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+/* =========================================
+   HEALTH ICONS
+========================================= */
+
+.health-card svg:not(.recharts-surface) {
+  color: #67e8f9;
+}
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+  .health-card {
+    padding: 16px;
+  }
+
+  .health-card svg text {
+    font-size: 10px;
+  }
+
+  .health-card .metric-value,
+  .health-card .health-value,
+  .health-card .score,
+  .health-card .health-score {
+    font-size: 20px;
+  }
+}
