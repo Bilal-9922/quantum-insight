@@ -9,6 +9,7 @@ from app.api.routes_optimizer import router as optimizer_router
 from app.api.routes_debugger import router as debugger_router
 from app.api.routes_reports import router as reports_router
 from app.api.routes_auth import router as auth_router
+from app.api.routes_history import router as history_router
 
 
 app = FastAPI(
@@ -32,6 +33,7 @@ app.include_router(optimizer_router, prefix="/api")
 app.include_router(debugger_router, prefix="/api")
 app.include_router(reports_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(history_router, prefix="/api")
 
 
 def custom_openapi():
