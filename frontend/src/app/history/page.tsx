@@ -1,5 +1,7 @@
 "use client";
 
+// Cloudflare build verification
+
 import { useEffect, useState } from "react";
 import { useRequireAuth } from "../../lib/auth";
 import { Icon } from "../../components/Icons";
