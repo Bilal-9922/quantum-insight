@@ -1,7 +1,0 @@
-[build]
-  base = "frontend"
-  command = "npm run build"
-  publish = ".next"
-
-[build.environment]
-  NEXT_PUBLIC_API_URL = "https://quantuminsight-backend.onrender.com"
