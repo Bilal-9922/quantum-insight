@@ -2,14 +2,11 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 const API =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function ResetPasswordPage() {
-  const searchParams = useSearchParams();
-
   const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,14 +17,15 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const resetToken = searchParams.get("token");
+    const params = new URLSearchParams(window.location.search);
+    const resetToken = params.get("token");
 
     if (resetToken) {
       setToken(resetToken);
     } else {
       setError("Invalid or missing password reset link.");
     }
-  }, [searchParams]);
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -76,6 +74,7 @@ export default function ResetPasswordPage() {
       }
 
       setSuccess(true);
+
       setMessage(
         data.message ||
           "Password reset successfully. You can now sign in."
@@ -98,6 +97,7 @@ export default function ResetPasswordPage() {
     <main className="min-h-screen bg-[#050816] text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl">
+
           <div className="mb-8 text-center">
             <h1 className="text-3xl font-bold">
               Reset Password
@@ -110,6 +110,7 @@ export default function ResetPasswordPage() {
 
           {success ? (
             <div className="space-y-6">
+
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-300">
                 {message}
               </div>
@@ -120,12 +121,14 @@ export default function ResetPasswordPage() {
               >
                 Go to Sign In
               </Link>
+
             </div>
           ) : (
             <form
               onSubmit={handleSubmit}
               className="space-y-5"
             >
+
               <div>
                 <label
                   htmlFor="password"
@@ -196,8 +199,10 @@ export default function ResetPasswordPage() {
                   ← Back to Sign In
                 </Link>
               </div>
+
             </form>
           )}
+
         </div>
       </div>
     </main>
