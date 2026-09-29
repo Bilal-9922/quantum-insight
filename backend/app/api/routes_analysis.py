@@ -36,7 +36,7 @@ class CodeRequest(BaseModel):
 def authenticated_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
-    return current_user(credentials.credentials)
+    return current_user(f"Bearer {credentials.credentials}")
 
 
 @router.post("/analyze")
