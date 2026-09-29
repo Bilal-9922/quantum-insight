@@ -13,6 +13,7 @@ DB_PATH = Path(os.getenv("AUTH_DB_PATH", "./quantuminsight.db"))
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret-in-production")
 JWT_ALGORITHM = "HS256"
 TOKEN_DAYS = 7
+RESET_TOKEN_MINUTES = 30
 
 
 def _connect():
