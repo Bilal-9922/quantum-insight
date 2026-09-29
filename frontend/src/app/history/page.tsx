@@ -50,7 +50,7 @@ export default function History() {
   useEffect(() => {
     if (authLoading) return;
 
-    const token = localStorage.getItem("quantuminsight_token");
+    const token = localStorage.getItem("qi_token");
 
     if (!token) {
       setLoading(false);
