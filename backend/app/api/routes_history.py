@@ -21,10 +21,13 @@ def get_history(
     user=Depends(authenticated_user),
 ):
     try:
+        user_id = user["id"]
+
         result = (
             supabase
             .table("analysis_history")
             .select("*")
+            .eq("user_id", user_id)
             .order("created_at", desc=True)
             .limit(limit)
             .execute()
