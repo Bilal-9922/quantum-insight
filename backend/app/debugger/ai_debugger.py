@@ -7,10 +7,7 @@ def diagnose(code, error=None):
     message = str(error or "").strip()
     text = message.lower()
 
-    # ---------------------------------------------------------
     # Syntax errors
-    # ---------------------------------------------------------
-
     if (
         "syntaxerror" in text
         or "invalid syntax" in text
@@ -30,10 +27,7 @@ def diagnose(code, error=None):
             ],
         }
 
-    # ---------------------------------------------------------
     # Qubit index errors
-    # ---------------------------------------------------------
-
     if (
         "index out of range" in text
         or "out of range for size" in text
@@ -54,10 +48,7 @@ def diagnose(code, error=None):
             ],
         }
 
-    # ---------------------------------------------------------
     # Parameter errors
-    # ---------------------------------------------------------
-
     if (
         "invalid parameter" in text
         or "parameter error" in text
@@ -77,10 +68,7 @@ def diagnose(code, error=None):
             ],
         }
 
-    # ---------------------------------------------------------
     # Gate errors
-    # ---------------------------------------------------------
-
     if (
         "unknown gate" in text
         or "invalid gate" in text
@@ -99,10 +87,7 @@ def diagnose(code, error=None):
             ],
         }
 
-    # ---------------------------------------------------------
     # Import errors
-    # ---------------------------------------------------------
-
     if (
         "modulenotfounderror" in text
         or "importerror" in text
@@ -120,10 +105,7 @@ def diagnose(code, error=None):
             ],
         }
 
-    # ---------------------------------------------------------
     # Circuit errors
-    # ---------------------------------------------------------
-
     if (
         "circuiterror" in text
         or "invalid circuit" in text
@@ -141,10 +123,7 @@ def diagnose(code, error=None):
             ],
         }
 
-    # ---------------------------------------------------------
     # Generic runtime error
-    # ---------------------------------------------------------
-
     if message:
         return {
             "diagnosis": (
@@ -159,19 +138,15 @@ def diagnose(code, error=None):
             ],
         }
 
-    # ---------------------------------------------------------
     # No error supplied
-    # ---------------------------------------------------------
-
-   # No error supplied
-return {
-    "diagnosis": (
-        "The submitted Qiskit circuit passed syntax and structural "
-        "validation. No obvious circuit error was detected."
-    ),
-    "suggestions": [
-        "The circuit uses valid Qiskit operations and qubit indices.",
-        "Review circuit depth and gate count for possible optimization.",
-        "Run the circuit through the Quantum Health Analyzer for a deeper quality assessment.",
-    ],
-}
+    return {
+        "diagnosis": (
+            "The submitted Qiskit circuit passed syntax and structural "
+            "validation. No obvious circuit error was detected."
+        ),
+        "suggestions": [
+            "The circuit uses valid Qiskit operations and qubit indices.",
+            "Review circuit depth and gate count for possible optimization.",
+            "Run the circuit through the Quantum Health Analyzer for a deeper quality assessment.",
+        ],
+    }
