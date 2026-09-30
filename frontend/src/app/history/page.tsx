@@ -48,6 +48,7 @@ export default function History() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
@@ -95,6 +96,70 @@ export default function History() {
     loadHistory();
   }, [authLoading]);
 
+  async function copyHistory() {
+    if (history.length === 0) {
+      setCopyStatus("No history to copy.");
+      return;
+    }
+
+    const historyText = history
+      .map((item, index) => {
+        const recommendations =
+          item.recommendations?.recommendations?.length > 0
+            ? item.recommendations.recommendations
+                .map((recommendation) => `- ${recommendation}`)
+                .join("\n")
+            : "None";
+
+        return [
+          `==============================`,
+          `Analysis ${index + 1}`,
+          `==============================`,
+          `Date: ${new Date(item.created_at).toLocaleString()}`,
+          `Quantum Health Index: ${item.health_score.toFixed(1)}/100`,
+          `Health Category: ${item.health_category}`,
+          `Qubits: ${item.metrics?.qubits ?? "—"}`,
+          `Gates: ${item.metrics?.gate_count ?? "—"}`,
+          `Depth: ${item.metrics?.depth ?? "—"}`,
+          `Anomaly Score: ${item.anomaly_score ?? "—"}`,
+          ``,
+          `Circuit:`,
+          item.circuit || "No circuit available.",
+          ``,
+          `Recommendations:`,
+          recommendations,
+          ``,
+          `Explanation:`,
+          item.explanation || "No explanation available.",
+          ``,
+        ].join("\n");
+      })
+      .join("\n");
+
+    const fullText = [
+      "QuantumInsight — Analysis History",
+      "=================================",
+      `Total Records: ${history.length}`,
+      `Exported: ${new Date().toLocaleString()}`,
+      ``,
+      historyText,
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(fullText);
+
+      setCopyStatus("History copied!");
+
+      window.setTimeout(() => {
+        setCopyStatus("");
+      }, 2500);
+    } catch {
+      setCopyStatus(
+        "Unable to copy history. Please check browser permissions."
+      );
+    }
+  }
+
   if (authLoading || loading) {
     return (
       <div className="py-20 text-center text-slate-500">
@@ -106,18 +171,34 @@ export default function History() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="section-kicker">
-          Workspace records
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="section-kicker">
+              Workspace records
+            </p>
 
-        <h1 className="mt-2 text-3xl font-black">
-          Analysis History
-        </h1>
+            <h1 className="mt-2 text-3xl font-black">
+              Analysis History
+            </h1>
 
-        <p className="mt-2 text-sm text-slate-500">
-          View your previously analyzed quantum circuits and
-          their Quantum Health Index results.
-        </p>
+            <p className="mt-2 text-sm text-slate-500">
+              View your previously analyzed quantum circuits and
+              their Quantum Health Index results.
+            </p>
+          </div>
+
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={copyHistory}
+              className="btn btn-secondary inline-flex items-center justify-center gap-2"
+            >
+              <Icon name="copy" size={15} />
+
+              {copyStatus || "Copy History"}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
