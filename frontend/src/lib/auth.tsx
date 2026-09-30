@@ -11,7 +11,7 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   googleLogin: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -61,7 +61,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 }
   async function register(name: string, email: string, password: string) { await authRequest("/api/auth/register", { name, email, password }); }
-  function logout() { window.localStorage.removeItem("qi_token"); setToken(null); setUser(null); }
+  async function logout() {
+  const { supabase } = await import("./supabase");
+
+  await supabase.auth.signOut();
+
+  window.localStorage.removeItem("qi_token");
+  setToken(null);
+  setUser(null);
+}
 
   return (
   <AuthContext.Provider
