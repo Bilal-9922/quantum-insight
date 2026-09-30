@@ -1,13 +1,12 @@
+```python
 import os
 import re
-import sqlite3
 
-import resend 
+import resend
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.auth import (
-    DB_PATH,
     authenticate,
     create_password_reset_token,
     create_token,
@@ -16,6 +15,7 @@ from app.auth import (
     register_user,
     reset_password,
 )
+from app.core.supabase import supabase
 
 router = APIRouter(tags=["authentication"])
 
@@ -44,7 +44,10 @@ class ResetPasswordRequest(BaseModel):
 
 @router.post("/auth/register")
 def register(req: RegisterRequest):
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", req.email.strip()):
+    if not re.fullmatch(
+        r"[^@\s]+@[^@\s]+\.[^@\s]+",
+        req.email.strip(),
+    ):
         raise HTTPException(
             status_code=422,
             detail="Enter a valid email address.",
@@ -86,20 +89,18 @@ def me(user=Depends(current_user)):
 def forgot_password(req: ForgotPasswordRequest):
     email = req.email.strip().lower()
 
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-
-    try:
-        user = conn.execute(
-            "SELECT * FROM users WHERE email=?",
-            (email,),
-        ).fetchone()
-    finally:
-        conn.close()
+    response = (
+        supabase
+        .table("users")
+        .select("id, name, email")
+        .eq("email", email)
+        .limit(1)
+        .execute()
+    )
 
     # Always return the same response so attackers cannot
     # discover whether an email is registered.
-    if not user:
+    if not response.data:
         return {
             "success": True,
             "message": (
@@ -107,6 +108,8 @@ def forgot_password(req: ForgotPasswordRequest):
                 "a reset link has been sent."
             ),
         }
+
+    user = response.data[0]
 
     token = create_password_reset_token(user["id"])
 
@@ -208,3 +211,4 @@ def reset_password_endpoint(req: ResetPasswordRequest):
             "You can now sign in."
         ),
     }
+```
