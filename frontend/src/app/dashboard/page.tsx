@@ -19,6 +19,12 @@ type HistoryResponse = {
   history: HistoryItem[];
 };
 
+type DeleteHistoryResponse = {
+  success: boolean;
+  message: string;
+  deleted_count: number;
+};
+
 const API =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://127.0.0.1:8000";
@@ -50,6 +56,14 @@ export default function Dashboard() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
+  const [showResetConfirm, setShowResetConfirm] =
+    useState(false);
+
+  const [resetting, setResetting] = useState(false);
+
+  const [resetStatus, setResetStatus] =
+    useState("");
+
   useEffect(() => {
     if (loading || !user) return;
 
@@ -73,7 +87,9 @@ export default function Dashboard() {
         );
 
         if (!response.ok) {
-          throw new Error("Failed to load dashboard history.");
+          throw new Error(
+            "Failed to load dashboard history."
+          );
         }
 
         const data: HistoryResponse =
@@ -93,6 +109,77 @@ export default function Dashboard() {
     loadHistory();
   }, [loading, user]);
 
+  async function resetDashboardData() {
+    const token = localStorage.getItem("qi_token");
+
+    if (!token) {
+      setResetStatus(
+        "Authentication session not found."
+      );
+      return;
+    }
+
+    try {
+      setResetting(true);
+      setResetStatus("");
+
+      const response = await fetch(
+        `${API}/api/history`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data:
+        | DeleteHistoryResponse
+        | { detail?: string } =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          "detail" in data && data.detail
+            ? data.detail
+            : `Failed to reset dashboard (${response.status})`
+        );
+      }
+
+      /*
+       * Clear the local dashboard state immediately.
+       * Because the dashboard metrics are calculated
+       * from this state, all metrics reset automatically.
+       */
+      setHistory([]);
+
+      setShowResetConfirm(false);
+
+      setResetStatus(
+        `Dashboard data reset successfully${
+          "deleted_count" in data
+            ? ` (${data.deleted_count} analyses deleted)`
+            : ""
+        }.`
+      );
+
+      window.setTimeout(() => {
+        setResetStatus("");
+      }, 4000);
+    } catch (error) {
+      setResetStatus(
+        error instanceof Error
+          ? error.message
+          : "Failed to reset dashboard data."
+      );
+    } finally {
+      setResetting(false);
+    }
+  }
+
   if (loading || !user) {
     return (
       <div className="py-20 text-center text-slate-500">
@@ -106,7 +193,8 @@ export default function Dashboard() {
   const averageQHI =
     analyses > 0
       ? history.reduce(
-          (sum, item) => sum + Number(item.health_score || 0),
+          (sum, item) =>
+            sum + Number(item.health_score || 0),
           0
         ) / analyses
       : null;
@@ -114,7 +202,8 @@ export default function Dashboard() {
   const averageAnomaly =
     analyses > 0
       ? history.reduce(
-          (sum, item) => sum + Number(item.anomaly_score || 0),
+          (sum, item) =>
+            sum + Number(item.anomaly_score || 0),
           0
         ) / analyses
       : null;
@@ -151,15 +240,36 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <Link
-            href="/analyzer"
-            className="btn btn-primary shrink-0"
-          >
-            New circuit analysis
-            <Icon name="arrow" size={15} />
-          </Link>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link
+              href="/analyzer"
+              className="btn btn-primary shrink-0"
+            >
+              New circuit analysis
+              <Icon name="arrow" size={15} />
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                setResetStatus("");
+                setShowResetConfirm(true);
+              }}
+              disabled={history.length === 0}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/5 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Icon name="trash" size={15} />
+              Reset Data
+            </button>
+          </div>
         </div>
       </section>
+
+      {resetStatus && (
+        <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-sm text-cyan-300">
+          {resetStatus}
+        </div>
+      )}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
@@ -285,7 +395,7 @@ export default function Dashboard() {
                       }deg, rgba(255,255,255,.07) ${
                         qhiProgress * 3.6
                       }deg)`
-                    : "conic-gradient(#22d3ee 0deg, #6366f1 115deg, #a855f7 210deg, rgba(255,255,255,.07) 210deg)",
+                    : "conic-gradient(#22d3ee 0deg, #6366f1 0deg, rgba(255,255,255,.07) 0deg)",
               }}
             >
               <div className="grid h-36 w-36 place-items-center rounded-full bg-slate-950">
@@ -361,6 +471,59 @@ export default function Dashboard() {
           ))}
         </div>
       </section>
+
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
+                <Icon name="trash" size={20} />
+              </div>
+
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  Reset dashboard data?
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  This will permanently delete all your
+                  saved analysis history and reset the
+                  dashboard metrics to their empty state.
+                </p>
+
+                <p className="mt-3 text-xs leading-5 text-slate-600">
+                  Your account, profile and authentication
+                  will not be affected.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() =>
+                  setShowResetConfirm(false)
+                }
+                disabled={resetting}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={resetDashboardData}
+                disabled={resetting}
+                className="rounded-xl bg-rose-500/90 px-4 py-2 text-sm font-bold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {resetting
+                  ? "Resetting..."
+                  : "Reset Dashboard"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
