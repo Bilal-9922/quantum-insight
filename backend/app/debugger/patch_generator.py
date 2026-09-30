@@ -25,6 +25,7 @@ def generate_patch(code, error=None):
         or "was never closed" in text
         or "unexpected eof" in text
         or "unexpected end of input" in text
+        or "eof while parsing" in text
     )
 
     if is_syntax_error:
@@ -76,65 +77,75 @@ def generate_patch(code, error=None):
 
 def _handle_syntax_error(code):
     """
-    Safely repair a simple missing closing delimiter.
+    Safely repair an unclosed delimiter.
 
-    The function only patches code when tokenization shows that
-    parentheses, brackets, or braces are left open.
+    Tokenization is allowed to stop with EOF because incomplete
+    Python such as:
 
-    It does not attempt to rewrite arbitrary Python syntax.
+        qc.h(0
+
+    can produce a TokenError before all tokens are returned.
+
+    We still inspect the tokens collected before that error.
     """
-
-    try:
-        tokens = list(
-            tokenize.generate_tokens(
-                StringIO(code).readline
-            )
-        )
-    except (tokenize.TokenError, IndentationError):
-        # Tokenization can still fail for an unfinished string.
-        # Do not guess how to repair it.
-        return None
-
-    opening = {
-        "(": ")",
-        "[": "]",
-        "{": "}",
-    }
-
-    closing = {
-        ")": "(",
-        "]": "[",
-        "}": "{",
-    }
 
     stack = []
 
-    for token in tokens:
-        value = token.string
+    try:
+        token_stream = tokenize.generate_tokens(
+            StringIO(code).readline
+        )
 
-        if value in opening:
-            stack.append(value)
+        while True:
+            try:
+                token = next(token_stream)
+            except StopIteration:
+                break
+            except tokenize.TokenError:
+                # Incomplete code can end with an EOF tokenization
+                # error. The tokens collected before this point are
+                # still useful for detecting an unmatched delimiter.
+                break
 
-        elif value in closing:
-            if not stack:
-                return None
+            value = token.string
 
-            if stack[-1] != closing[value]:
-                return None
+            if value in {"(", "[", "{"}:
+                stack.append(value)
 
-            stack.pop()
+            elif value in {")", "]", "}"}:
+                if not stack:
+                    return None
+
+                expected_opening = {
+                    ")": "(",
+                    "]": "[",
+                    "}": "{",
+                }[value]
+
+                if stack[-1] != expected_opening:
+                    return None
+
+                stack.pop()
+
+    except (IndentationError, SyntaxError):
+        return None
 
     # Nothing is structurally unclosed.
     if not stack:
         return None
 
-    # Only append the required closing delimiters.
+    closing_delimiters = {
+        "(": ")",
+        "[": "]",
+        "{": "}",
+    }
+
     missing = "".join(
-        opening[item]
+        closing_delimiters[item]
         for item in reversed(stack)
     )
 
-    fixed_code = code.rstrip() + missing + "\n"
+    fixed_code = code.rstrip() + missing
 
     # Make sure the generated code is actually valid Python.
     try:
@@ -187,7 +198,6 @@ def _handle_qubit_error(code, message):
             ),
         }
 
-    # Find the exact gate containing the invalid index.
     offending_gate = _find_offending_gate(
         tree,
         invalid_index,
