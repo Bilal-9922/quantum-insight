@@ -45,11 +45,10 @@ export default function ForgotPasswordPage() {
         data.message ||
           "If an account exists for this email, a reset link has been sent."
       );
-    } catch (err) {
+    } catch {
+      // Do not expose backend/provider errors to the user.
       setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again."
+        "Unable to send reset instructions. Please check your email address and try again."
       );
     } finally {
       setLoading(false);
