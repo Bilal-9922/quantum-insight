@@ -46,21 +46,35 @@ def recommend(analysis):
     # 1. Two-qubit operations
     # ---------------------------------------------------------
 
-    if two_qubit_ratio >= 0.50:
-        recommendations.append(
-            f"Two-qubit operations are dominant "
-            f"({two_qubit_ratio * 100:.1f}% of gates). "
-            "Review CX, CZ, and SWAP sequences for possible "
-            "cancellation, fusion, or restructuring."
-        )
-
-    elif two_qubit_ratio >= 0.25:
-        recommendations.append(
-            f"The circuit contains a moderate two-qubit gate ratio "
-            f"({two_qubit_ratio * 100:.1f}%). "
-            "Check whether neighboring entangling operations can "
-            "be simplified or cancelled."
-        )
+  if two_qubit_gates <= 1 and gates <= 5:
+    recommendations.append(
+        f"The circuit contains {two_qubit_gates} entangling "
+        "operation in a very small workload. This is not "
+        "necessarily an issue; preserve it unless backend "
+        "constraints or transpilation introduce additional "
+        "overhead."
+    )
+elif two_qubit_ratio >= 0.75:
+    recommendations.append(
+        f"Two-qubit operations are very high "
+        f"({two_qubit_ratio * 100:.1f}% of gates). "
+        "Review CX, CZ, and SWAP sequences for possible "
+        "cancellation, fusion, or restructuring."
+    )
+elif two_qubit_ratio >= 0.50:
+    recommendations.append(
+        f"Two-qubit operations make up "
+        f"{two_qubit_ratio * 100:.1f}% of gates. "
+        "For larger circuits, review entangling sequences "
+        "for unnecessary operations and possible cancellation."
+    )
+elif two_qubit_ratio >= 0.25:
+    recommendations.append(
+        f"The circuit contains a moderate two-qubit gate ratio "
+        f"({two_qubit_ratio * 100:.1f}%). "
+        "Check whether neighboring entangling operations can "
+        "be simplified or cancelled."
+    )
 
     # ---------------------------------------------------------
     # 2. Circuit depth
