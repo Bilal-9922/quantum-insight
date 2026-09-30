@@ -1,4 +1,3 @@
-```python
 import os
 import re
 
@@ -211,4 +210,4 @@ def reset_password_endpoint(req: ResetPasswordRequest):
             "You can now sign in."
         ),
     }
-```
+
