@@ -57,24 +57,21 @@ def generate_patch(code, error=None):
 
 def _handle_syntax_error(code, error_message):
     """
-    Safely fix a simple missing closing parenthesis.
+    Safely fix one missing closing delimiter.
 
-    Example:
+    Supported:
+        (
+        [
+        {
 
-        qc.h(0
-        qc.cx(0, 1)
-
-    becomes:
-
-        qc.h(0)
-        qc.cx(0, 1)
+    The correction is inserted on the line reported by Python.
     """
 
     if not code.strip():
         return None
 
     # ---------------------------------------------------------
-    # Parse original code to obtain the exact syntax-error line.
+    # Get the actual Python syntax error.
     # ---------------------------------------------------------
 
     try:
@@ -91,7 +88,7 @@ def _handle_syntax_error(code, error_message):
         + error_message.lower()
     )
 
-    # Only handle an unclosed parenthesis.
+    # Only handle an unclosed delimiter.
     if (
         "was never closed" not in combined_message
         and "eof while parsing" not in combined_message
@@ -108,42 +105,64 @@ def _handle_syntax_error(code, error_message):
         return None
 
     # ---------------------------------------------------------
-    # The missing parenthesis belongs on the line reported
-    # by Python.
+    # Find unmatched delimiters.
+    # ---------------------------------------------------------
+
+    delimiter_stack = _find_delimiter_stack(code)
+
+    if delimiter_stack is None:
+        return None
+
+    # Only make a correction when exactly one delimiter is open.
+    if len(delimiter_stack) != 1:
+        return None
+
+    opening = delimiter_stack[0]
+
+    closing = {
+        "(": ")",
+        "[": "]",
+        "{": "}",
+    }.get(opening)
+
+    if closing is None:
+        return None
+
+    # ---------------------------------------------------------
+    # Insert the missing delimiter on the reported line.
     # ---------------------------------------------------------
 
     target_index = error_line - 1
     target_line = lines[target_index]
 
-    # Do not modify a comment.
     stripped = target_line.lstrip()
 
+    # Never modify a comment line.
     if stripped.startswith("#"):
         return None
 
-    # ---------------------------------------------------------
-    # Confirm that this line contains an unmatched opening
-    # parenthesis.
-    # ---------------------------------------------------------
+    # Avoid inserting into a trailing comment.
+    comment_position = _find_comment_position(target_line)
 
-    before_line = "\n".join(
-        lines[:target_index + 1]
-    )
+    if comment_position is not None:
+        code_part = target_line[:comment_position].rstrip()
+        comment_part = target_line[comment_position:]
 
-    balance = _parenthesis_balance(before_line)
+        if not code_part:
+            return None
 
-    if balance != 1:
-        return None
+        lines[target_index] = (
+            code_part
+            + closing
+            + " "
+            + comment_part.lstrip()
+        )
 
-    # ---------------------------------------------------------
-    # Add the missing ')' at the end of the offending line.
-    # ---------------------------------------------------------
-
-    lines[target_index] = target_line + ")"
+    else:
+        lines[target_index] = target_line + closing
 
     fixed_code = "\n".join(lines)
 
-    # Preserve a final newline if the original had one.
     if code.endswith("\n"):
         fixed_code += "\n"
 
@@ -161,26 +180,23 @@ def _handle_syntax_error(code, error_message):
         "fixed_code": fixed_code,
         "changed": True,
         "note": (
-            f"The debugger detected an unclosed parenthesis "
-            f"on line {error_line} and automatically added "
-            "the missing ')'."
+            f"The debugger detected an unclosed "
+            f"'{opening}' on line {error_line} "
+            f"and automatically added the missing "
+            f"'{closing}'."
         ),
     }
 
 
-def _parenthesis_balance(code):
+def _find_delimiter_stack(code):
     """
-    Count unmatched parentheses while ignoring strings
-    and comments.
+    Find unmatched (, [, and { delimiters.
 
-    Returns:
-
-        1  -> one '(' is unclosed
-        0  -> balanced
-        -1 -> too many ')'
+    Strings and comments are ignored.
     """
 
-    balance = 0
+    stack = []
+
     i = 0
     length = len(code)
 
@@ -250,22 +266,68 @@ def _parenthesis_balance(code):
             continue
 
         # -----------------------------------------------------
-        # Parentheses
+        # Opening delimiters
         # -----------------------------------------------------
 
-        if char == "(":
-            balance += 1
+        if char in "([{":
+            stack.append(char)
 
-        elif char == ")":
+        # -----------------------------------------------------
+        # Closing delimiters
+        # -----------------------------------------------------
 
-            balance -= 1
+        elif char in ")]}":
 
-            if balance < 0:
-                return balance
+            expected = {
+                ")": "(",
+                "]": "[",
+                "}": "{",
+            }[char]
+
+            if not stack:
+                return None
+
+            if stack[-1] != expected:
+                return None
+
+            stack.pop()
 
         i += 1
 
-    return balance
+    return stack
+
+
+def _find_comment_position(line):
+    """
+    Find a real # comment while ignoring # inside strings.
+    """
+
+    in_single = False
+    in_double = False
+    escaped = False
+
+    for index, char in enumerate(line):
+
+        if escaped:
+            escaped = False
+            continue
+
+        if char == "\\":
+            escaped = True
+            continue
+
+        if char == "'" and not in_double:
+            in_single = not in_single
+            continue
+
+        if char == '"' and not in_single:
+            in_double = not in_double
+            continue
+
+        if char == "#" and not in_single and not in_double:
+            return index
+
+    return None
 
 
 def _handle_qubit_error(code, message):
