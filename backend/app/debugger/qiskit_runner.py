@@ -1,13 +1,56 @@
 import ast
 
 
+# Common Qiskit QuantumCircuit methods that represent
+# supported circuit operations.
+SUPPORTED_GATES = {
+    "h",
+    "x",
+    "y",
+    "z",
+    "s",
+    "sdg",
+    "t",
+    "tdg",
+    "sx",
+    "sxdg",
+    "id",
+    "reset",
+    "measure",
+    "measure_all",
+    "barrier",
+    "cx",
+    "cy",
+    "cz",
+    "ch",
+    "swap",
+    "iswap",
+    "ecr",
+    "ccx",
+    "cswap",
+    "rx",
+    "ry",
+    "rz",
+    "p",
+    "phase",
+    "u",
+    "u1",
+    "u2",
+    "u3",
+}
+
+
 def run_qiskit_check(code: str):
     """
     Perform static Qiskit circuit validation.
 
     This does not execute arbitrary user Python.
-    It inspects common QuantumCircuit construction patterns
-    and detects qubit-index and parameter errors.
+    It checks:
+    - Python syntax
+    - QuantumCircuit size
+    - unsupported gate names
+    - qubit indices
+    - invalid string parameters
     """
 
     if not code or not code.strip():
@@ -27,7 +70,10 @@ def run_qiskit_check(code: str):
             "line": e.lineno,
         }
 
+    # ---------------------------------------------------------
     # Find QuantumCircuit size
+    # ---------------------------------------------------------
+
     qubits = None
 
     for node in ast.walk(tree):
@@ -62,7 +108,7 @@ def run_qiskit_check(code: str):
         }
 
     # ---------------------------------------------------------
-    # Detect gate calls
+    # Find gate calls
     # ---------------------------------------------------------
 
     gate_calls = []
@@ -77,15 +123,28 @@ def run_qiskit_check(code: str):
         gate_name = node.func.attr.lower()
 
         ignored_methods = {
-            "measure_all",
             "draw",
             "decompose",
             "depth",
             "count_ops",
-            "barrier",
+            "remove_final_measurements",
         }
 
         if gate_name in ignored_methods:
+            continue
+
+        # Only inspect methods called on an object.
+        # This covers common code such as qc.h(...).
+        if not isinstance(node.func.value, ast.Name):
+            continue
+
+        object_name = node.func.value.id.lower()
+
+        if object_name not in {
+            "qc",
+            "circuit",
+            "quantum_circuit",
+        }:
             continue
 
         gate_calls.append({
@@ -95,12 +154,31 @@ def run_qiskit_check(code: str):
         })
 
     # ---------------------------------------------------------
-    # Qubit index validation
+    # Gate validation
     # ---------------------------------------------------------
 
     for call in gate_calls:
         gate = call["gate"]
 
+        if gate not in SUPPORTED_GATES:
+            return {
+                "success": False,
+                "error_type": "GATE_ERROR",
+                "error": (
+                    f"Unknown or unsupported gate "
+                    f"'{gate}'."
+                ),
+                "line": call["line"],
+                "gate": gate,
+                "qubits": qubits,
+            }
+
+    # ---------------------------------------------------------
+    # Qubit index validation
+    # ---------------------------------------------------------
+
+    for call in gate_calls:
+        gate = call["gate"]
         qubit_positions = _qubit_positions(gate)
 
         for position in qubit_positions:
@@ -132,7 +210,6 @@ def run_qiskit_check(code: str):
 
     for call in gate_calls:
         gate = call["gate"]
-
         parameter_positions = _parameter_positions(gate)
 
         for position in parameter_positions:
@@ -141,18 +218,18 @@ def run_qiskit_check(code: str):
 
             parameter = call["args"][position]
 
-            # String parameters are invalid for normal
-            # numeric Qiskit rotation/phase gates.
             if isinstance(parameter, ast.Constant):
                 if isinstance(parameter.value, str):
                     return {
                         "success": False,
                         "error_type": "PARAMETER_ERROR",
                         "error": (
-                            f"Invalid parameter value for {gate} gate."
+                            f"Invalid parameter value for "
+                            f"{gate} gate."
                         ),
                         "line": call["line"],
                         "gate": gate,
+                        "qubits": qubits,
                     }
 
     return {
@@ -165,10 +242,6 @@ def run_qiskit_check(code: str):
 
 
 def _qubit_positions(gate):
-    """
-    Return argument positions that represent qubit indices.
-    """
-
     single_qubit_gates = {
         "h",
         "x",
@@ -222,16 +295,12 @@ def _qubit_positions(gate):
         return [0, 1, 2]
 
     if gate in parameterized_one_qubit_gates:
-        return [1] if gate not in {"u", "u3"} else [3]
+        return [1]
 
     return []
 
 
 def _parameter_positions(gate):
-    """
-    Return argument positions that represent numeric parameters.
-    """
-
     parameterized_gates = {
         "rx": [0],
         "ry": [0],
