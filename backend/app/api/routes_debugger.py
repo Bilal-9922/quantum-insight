@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
 from app.debugger.ast_analyzer import analyze_ast
 from app.auth import current_user
 from app.debugger.classifier import classify
@@ -8,12 +9,15 @@ from app.debugger.patch_generator import generate_patch
 from app.debugger.verifier import verify
 from app.debugger.qiskit_runner import run_qiskit_check
 
+
 router = APIRouter(tags=["debugger"])
+
 
 class DebugRequest(BaseModel):
     code: str
     error: str | None = None
     language: str = "python"
+
 
 @router.post("/debug")
 def debug(req: DebugRequest, user=Depends(current_user)):
@@ -26,11 +30,13 @@ def debug(req: DebugRequest, user=Depends(current_user)):
     # Prefer the error discovered from the submitted code.
     # Fall back to the manually supplied error when necessary.
     detected_error = runner_result.get("error")
-
     error_message = detected_error or req.error
 
-    eerror_type = runner_result.get("error_type")
+    # Get the error type detected by the Qiskit validator.
+    error_type = runner_result.get("error_type")
 
+    # If there is no detected error, determine whether this is
+    # a valid circuit with no supplied runtime error.
     if not error_type:
         if (
             not error_message
