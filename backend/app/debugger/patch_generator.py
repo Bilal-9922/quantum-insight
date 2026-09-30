@@ -12,13 +12,29 @@ def generate_patch(code, error=None):
     text = message.lower()
 
     # ---------------------------------------------------------
-    # Syntax error auto-fix
+    # Simple missing parenthesis
     # ---------------------------------------------------------
 
-    syntax_patch = _handle_syntax_error(original_code, message)
+    if (
+        "was never closed" in text
+        and "'('" in text
+    ):
+        fixed_code = original_code.rstrip() + ")"
 
-    if syntax_patch is not None:
-        return syntax_patch
+        try:
+            ast.parse(fixed_code)
+
+            return {
+                "fixed_code": fixed_code,
+                "changed": True,
+                "note": (
+                    "The debugger detected an unclosed parenthesis "
+                    "and automatically added the missing ')'."
+                ),
+            }
+
+        except SyntaxError:
+            pass
 
     # ---------------------------------------------------------
     # Qubit index errors
@@ -50,7 +66,6 @@ def generate_patch(code, error=None):
             "correction can be determined reliably."
         ),
     }
-
 
 def _handle_syntax_error(code, error_message):
     """
