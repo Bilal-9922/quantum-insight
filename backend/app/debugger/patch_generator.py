@@ -19,6 +19,11 @@ def generate_patch(code, error=None):
     # Syntax errors
     # ---------------------------------------------------------
 
+    syntax_patch = _handle_syntax_error(original_code)
+
+    if syntax_patch is not None:
+        return syntax_patch
+
     is_syntax_error = (
         "syntaxerror" in text
         or "invalid syntax" in text
@@ -29,11 +34,6 @@ def generate_patch(code, error=None):
     )
 
     if is_syntax_error:
-        syntax_patch = _handle_syntax_error(original_code)
-
-        if syntax_patch is not None:
-            return syntax_patch
-
         return {
             "fixed_code": original_code,
             "changed": False,
@@ -77,19 +77,33 @@ def generate_patch(code, error=None):
 
 def _handle_syntax_error(code):
     """
-    Safely repair an unclosed delimiter.
+    Detect an unmatched opening delimiter and safely close it.
 
-    Tokenization is allowed to stop with EOF because incomplete
-    Python such as:
+    Example:
 
         qc.h(0
 
-    can produce a TokenError before all tokens are returned.
+    becomes:
 
-    We still inspect the tokens collected before that error.
+        qc.h(0)
     """
 
+    if not code.strip():
+        return None
+
     stack = []
+
+    opening = {
+        "(": ")",
+        "[": "]",
+        "{": "}",
+    }
+
+    closing = {
+        ")": "(",
+        "]": "[",
+        "}": "{",
+    }
 
     try:
         token_stream = tokenize.generate_tokens(
@@ -99,30 +113,29 @@ def _handle_syntax_error(code):
         while True:
             try:
                 token = next(token_stream)
+
             except StopIteration:
                 break
+
             except tokenize.TokenError:
-                # Incomplete code can end with an EOF tokenization
-                # error. The tokens collected before this point are
-                # still useful for detecting an unmatched delimiter.
+                # Incomplete Python commonly ends with a TokenError.
+                # The tokens collected before the error are still
+                # sufficient to detect an unmatched delimiter.
                 break
 
             value = token.string
 
-            if value in {"(", "[", "{"}:
+            if value in opening:
                 stack.append(value)
 
-            elif value in {")", "]", "}"}:
+            elif value in closing:
+
                 if not stack:
                     return None
 
-                expected_opening = {
-                    ")": "(",
-                    "]": "[",
-                    "}": "{",
-                }[value]
+                expected = closing[value]
 
-                if stack[-1] != expected_opening:
+                if stack[-1] != expected:
                     return None
 
                 stack.pop()
@@ -130,24 +143,39 @@ def _handle_syntax_error(code):
     except (IndentationError, SyntaxError):
         return None
 
-    # Nothing is structurally unclosed.
+    # Nothing is unclosed.
     if not stack:
         return None
 
-    closing_delimiters = {
-        "(": ")",
-        "[": "]",
-        "{": "}",
-    }
+    # Only automatically fix a single unmatched parenthesis.
+    #
+    # This keeps the automatic fixer conservative and prevents
+    # it from making large structural changes to user code.
+    if len(stack) != 1:
+        return None
 
-    missing = "".join(
-        closing_delimiters[item]
-        for item in reversed(stack)
-    )
+    if stack[0] != "(":
+        return None
 
-    fixed_code = code.rstrip() + missing
+    # Do not modify code when the final non-empty line is only
+    # a comment. Appending ")" after a comment would be unsafe.
+    non_empty_lines = [
+        line
+        for line in code.splitlines()
+        if line.strip()
+    ]
 
-    # Make sure the generated code is actually valid Python.
+    if not non_empty_lines:
+        return None
+
+    last_line = non_empty_lines[-1]
+
+    if "#" in last_line:
+        return None
+
+    fixed_code = code.rstrip() + ")"
+
+    # Verify the generated Python syntax.
     try:
         ast.parse(fixed_code)
     except SyntaxError:
@@ -157,8 +185,8 @@ def _handle_syntax_error(code):
         "fixed_code": fixed_code,
         "changed": True,
         "note": (
-            "The debugger detected an unclosed Python delimiter "
-            "and safely added the required closing delimiter(s)."
+            "The debugger detected an unclosed parenthesis "
+            "and automatically added the missing ')'."
         ),
     }
 
@@ -188,6 +216,7 @@ def _handle_qubit_error(code, message):
 
     try:
         tree = ast.parse(code)
+
     except SyntaxError:
         return {
             "fixed_code": code,
@@ -273,7 +302,9 @@ def _find_offending_gate(tree, invalid_index, qubit_count):
         for arg in node.args:
 
             if isinstance(arg, ast.Constant):
+
                 if isinstance(arg.value, int):
+
                     if (
                         arg.value == invalid_index
                         and (
