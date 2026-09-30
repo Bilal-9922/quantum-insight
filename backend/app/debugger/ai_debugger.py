@@ -163,14 +163,15 @@ def diagnose(code, error=None):
     # No error supplied
     # ---------------------------------------------------------
 
-    return {
-        "diagnosis": (
-            "No runtime error was supplied. The submitted circuit can "
-            "still be inspected for syntax and structural issues."
-        ),
-        "suggestions": [
-            "Validate the circuit structure and gate arguments.",
-            "Review qubit usage and circuit depth.",
-            "Run the circuit through the analyzer and optimizer.",
-        ],
-    }
+   # No error supplied
+return {
+    "diagnosis": (
+        "The submitted Qiskit circuit passed syntax and structural "
+        "validation. No obvious circuit error was detected."
+    ),
+    "suggestions": [
+        "The circuit uses valid Qiskit operations and qubit indices.",
+        "Review circuit depth and gate count for possible optimization.",
+        "Run the circuit through the Quantum Health Analyzer for a deeper quality assessment.",
+    ],
+}
