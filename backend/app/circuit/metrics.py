@@ -1,6 +1,22 @@
 from collections import Counter
 
 
+SELF_INVERSE_GATES = {
+    "x",
+    "y",
+    "z",
+    "h",
+    "cx",
+    "cy",
+    "cz",
+    "ch",
+    "swap",
+    "iswap",
+    "ccx",
+    "cswap",
+}
+
+
 def extract_metrics(circuit):
     if isinstance(circuit, dict):
         gates = circuit["gates"]
@@ -44,7 +60,10 @@ def extract_metrics(circuit):
     measurement = sum(
         1
         for g in gates
-        if g["name"] in {"measure", "measure_all"}
+        if g["name"] in {
+            "measure",
+            "measure_all",
+        }
     )
 
     # ---------------------------------------------------------
@@ -54,8 +73,7 @@ def extract_metrics(circuit):
     active_qubits = set()
 
     for gate in gates:
-        # Measurement and barriers should not make an
-        # otherwise unused qubit count as computationally active.
+
         if gate["name"].lower() in {
             "measure",
             "measure_all",
@@ -64,6 +82,7 @@ def extract_metrics(circuit):
             continue
 
         for qubit in gate["qubits"]:
+
             if 0 <= qubit < qubits:
                 active_qubits.add(qubit)
 
@@ -74,12 +93,23 @@ def extract_metrics(circuit):
     )
 
     # ---------------------------------------------------------
+    # Gate cancellation opportunities
+    # ---------------------------------------------------------
+
+    cancellation_count = _count_cancellation_opportunities(
+        gates
+    )
+
+    # ---------------------------------------------------------
     # Other circuit metrics
     # ---------------------------------------------------------
 
     density = (
         gate_count
-        / max(1, qubits * max(1, depth))
+        / max(
+            1,
+            qubits * max(1, depth)
+        )
     )
 
     two_ratio = (
@@ -115,8 +145,56 @@ def extract_metrics(circuit):
             measurement_ratio,
             4
         ),
+        "cancellation_opportunities": cancellation_count,
         "gate_counts": dict(counts),
     }
+
+
+def _count_cancellation_opportunities(gates):
+    """
+    Count adjacent identical self-inverse gates.
+
+    Examples:
+
+        x(0), x(0)
+        h(0), h(0)
+        cx(0, 1), cx(0, 1)
+
+    These pairs cancel because:
+
+        G * G = I
+
+    for self-inverse gates.
+    """
+
+    count = 0
+
+    for i in range(len(gates) - 1):
+
+        current = gates[i]
+        following = gates[i + 1]
+
+        current_name = current["name"].lower()
+        following_name = following["name"].lower()
+
+        if current_name != following_name:
+            continue
+
+        if current_name not in SELF_INVERSE_GATES:
+            continue
+
+        current_qubits = tuple(
+            current["qubits"]
+        )
+
+        following_qubits = tuple(
+            following["qubits"]
+        )
+
+        if current_qubits == following_qubits:
+            count += 1
+
+    return count
 
 
 def _light_depth(gates):
@@ -126,13 +204,18 @@ def _light_depth(gates):
     layers = []
 
     for gate in gates:
-        used = set(gate["qubits"])
+
+        used = set(
+            gate["qubits"]
+        )
 
         layer = 0
 
         while (
             layer < len(layers)
-            and used.intersection(layers[layer])
+            and used.intersection(
+                layers[layer]
+            )
         ):
             layer += 1
 
@@ -142,3 +225,10 @@ def _light_depth(gates):
         layers[layer].update(used)
 
     return len(layers)
+
+
+def circuit_to_gate_list(circuit):
+    if isinstance(circuit, dict):
+        return circuit["gates"]
+
+    return []
