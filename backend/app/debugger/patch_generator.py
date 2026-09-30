@@ -12,6 +12,18 @@ def generate_patch(code, error=None):
     text = message.lower()
 
     # ---------------------------------------------------------
+    # Indentation error auto-fix
+    # ---------------------------------------------------------
+
+    indentation_patch = _handle_indentation_error(
+        original_code,
+        message,
+    )
+
+    if indentation_patch is not None:
+        return indentation_patch
+
+    # ---------------------------------------------------------
     # Syntax error auto-fix
     # ---------------------------------------------------------
 
@@ -53,6 +65,194 @@ def generate_patch(code, error=None):
             "correction can be determined reliably."
         ),
     }
+
+
+def _handle_indentation_error(code, error_message):
+    """
+    Safely fix a simple missing indentation after a block statement.
+
+    Example:
+
+        if True:
+        qc.h(0)
+
+    becomes:
+
+        if True:
+            qc.h(0)
+
+    Only simple, unambiguous cases are modified.
+    """
+
+    message = str(error_message or "").lower()
+
+    indentation_patterns = (
+        "expected an indented block",
+        "unexpected indent",
+        "unindent does not match",
+    )
+
+    if not any(
+        pattern in message
+        for pattern in indentation_patterns
+    ):
+        return None
+
+    lines = code.splitlines()
+
+    if not lines:
+        return None
+
+    # ---------------------------------------------------------
+    # First try to identify the exact line reported by Python.
+    # ---------------------------------------------------------
+
+    error_line = None
+
+    try:
+        ast.parse(code)
+
+    except SyntaxError as exc:
+        error_line = exc.lineno
+
+    # ---------------------------------------------------------
+    # Handle a reported indentation line first.
+    # ---------------------------------------------------------
+
+    if error_line is not None:
+
+        target_index = error_line - 1
+
+        if (
+            0 <= target_index < len(lines)
+            and lines[target_index].strip()
+        ):
+            if target_index > 0:
+
+                previous_line = lines[target_index - 1]
+                target_line = lines[target_index]
+
+                previous_stripped = previous_line.strip()
+                target_stripped = target_line.strip()
+
+                previous_indent = (
+                    len(previous_line)
+                    - len(previous_line.lstrip())
+                )
+
+                target_indent = (
+                    len(target_line)
+                    - len(target_line.lstrip())
+                )
+
+                if (
+                    previous_stripped.endswith(":")
+                    and target_indent <= previous_indent
+                    and not target_stripped.startswith("#")
+                    and not target_stripped.startswith(
+                        ("else:", "elif ", "except", "finally:")
+                    )
+                ):
+                    lines[target_index] = (
+                        " " * (previous_indent + 4)
+                        + target_stripped
+                    )
+
+                    fixed_code = "\n".join(lines)
+
+                    if code.endswith("\n"):
+                        fixed_code += "\n"
+
+                    try:
+                        ast.parse(fixed_code)
+
+                    except SyntaxError:
+                        return None
+
+                    return {
+                        "fixed_code": fixed_code,
+                        "changed": True,
+                        "note": (
+                            f"The debugger detected a missing "
+                            f"indentation on line {error_line} "
+                            "and automatically indented the "
+                            "statement by four spaces."
+                        ),
+                    }
+
+    # ---------------------------------------------------------
+    # Fallback:
+    #
+    # Search for a block statement followed by a line that
+    # should clearly be inside that block.
+    # ---------------------------------------------------------
+
+    for index in range(len(lines) - 1):
+
+        current = lines[index]
+        following = lines[index + 1]
+
+        if not current.strip():
+            continue
+
+        if not following.strip():
+            continue
+
+        current_stripped = current.strip()
+        following_stripped = following.strip()
+
+        if not current_stripped.endswith(":"):
+            continue
+
+        if following_stripped.startswith("#"):
+            continue
+
+        current_indent = (
+            len(current)
+            - len(current.lstrip())
+        )
+
+        following_indent = (
+            len(following)
+            - len(following.lstrip())
+        )
+
+        if following_indent > current_indent:
+            continue
+
+        if following_stripped.startswith(
+            ("else:", "elif ", "except", "finally:")
+        ):
+            continue
+
+        lines[index + 1] = (
+            " " * (current_indent + 4)
+            + following_stripped
+        )
+
+        fixed_code = "\n".join(lines)
+
+        if code.endswith("\n"):
+            fixed_code += "\n"
+
+        try:
+            ast.parse(fixed_code)
+
+        except SyntaxError:
+            return None
+
+        return {
+            "fixed_code": fixed_code,
+            "changed": True,
+            "note": (
+                f"The debugger detected a missing indentation "
+                f"after the block statement on line {index + 1} "
+                "and automatically indented the following "
+                "statement by four spaces."
+            ),
+        }
+
+    return None
 
 
 def _handle_syntax_error(code, error_message):
@@ -145,6 +345,7 @@ def _handle_syntax_error(code, error_message):
     comment_position = _find_comment_position(target_line)
 
     if comment_position is not None:
+
         code_part = target_line[:comment_position].rstrip()
         comment_part = target_line[comment_position:]
 
