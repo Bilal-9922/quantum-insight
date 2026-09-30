@@ -54,6 +54,7 @@ export default function History() {
   const [error, setError] = useState("");
 
   const [copyStatus, setCopyStatus] = useState("");
+  const [exportStatus, setExportStatus] = useState("");
   const [deleteStatus, setDeleteStatus] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] =
@@ -190,6 +191,122 @@ export default function History() {
     }
   }
 
+  function escapeCsv(value: string | number) {
+    const text = String(value ?? "");
+
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  function exportHistoryCsv() {
+    if (history.length === 0) {
+      setExportStatus("No history to export.");
+
+      window.setTimeout(() => {
+        setExportStatus("");
+      }, 2500);
+
+      return;
+    }
+
+    const headers = [
+      "Analysis ID",
+      "Date",
+      "QHI Score",
+      "Health Category",
+      "Qubits",
+      "Gates",
+      "Depth",
+      "1Q Gates",
+      "2Q Gates",
+      "2Q Ratio",
+      "Gate Density",
+      "Measurement Ratio",
+      "Anomaly Score",
+      "AI Provider",
+      "Recommendation Summary",
+      "Recommendations",
+      "Explanation",
+      "Circuit",
+    ];
+
+    const rows = history.map((item) => {
+      const recommendations =
+        item.recommendations?.recommendations?.join(
+          " | "
+        ) || "";
+
+      return [
+        escapeCsv(item.id),
+        escapeCsv(
+          new Date(item.created_at).toLocaleString()
+        ),
+        escapeCsv(
+          Number(item.health_score || 0).toFixed(1)
+        ),
+        escapeCsv(item.health_category || ""),
+        escapeCsv(item.metrics?.qubits ?? ""),
+        escapeCsv(item.metrics?.gate_count ?? ""),
+        escapeCsv(item.metrics?.depth ?? ""),
+        escapeCsv(
+          item.metrics?.one_qubit_gates ?? ""
+        ),
+        escapeCsv(
+          item.metrics?.two_qubit_gates ?? ""
+        ),
+        escapeCsv(
+          item.metrics?.two_qubit_ratio ?? ""
+        ),
+        escapeCsv(
+          item.metrics?.gate_density ?? ""
+        ),
+        escapeCsv(
+          item.metrics?.measurement_ratio ?? ""
+        ),
+        escapeCsv(item.anomaly_score ?? ""),
+        escapeCsv(
+          item.recommendations?.provider ?? ""
+        ),
+        escapeCsv(
+          item.recommendations?.summary ?? ""
+        ),
+        escapeCsv(recommendations),
+        escapeCsv(item.explanation || ""),
+        escapeCsv(item.circuit || ""),
+      ].join(",");
+    });
+
+    const csv = [
+      headers.map(escapeCsv).join(","),
+      ...rows,
+    ].join("\r\n");
+
+    const blob = new Blob(
+      ["\ufeff" + csv],
+      {
+        type: "text/csv;charset=utf-8;",
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `quantuminsight-history-${Date.now()}.csv`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    setExportStatus("History exported!");
+
+    window.setTimeout(() => {
+      setExportStatus("");
+    }, 3000);
+  }
+
   async function deleteHistory() {
     const token = localStorage.getItem("qi_token");
 
@@ -309,7 +426,7 @@ export default function History() {
           </div>
 
           {history.length > 0 && (
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
                 onClick={copyHistory}
@@ -318,6 +435,16 @@ export default function History() {
                 <Icon name="copy" size={15} />
 
                 {copyStatus || "Copy History"}
+              </button>
+
+              <button
+                type="button"
+                onClick={exportHistoryCsv}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/20 hover:bg-cyan-400/10 hover:text-cyan-200"
+              >
+                <Icon name="download" size={15} />
+
+                Export CSV
               </button>
 
               <button
@@ -356,6 +483,16 @@ export default function History() {
           </span>
 
           History copied successfully.
+        </div>
+      )}
+
+      {exportStatus && (
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-4 py-3 text-sm text-emerald-300">
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-emerald-400/10">
+            <Icon name="check" size={13} />
+          </span>
+
+          {exportStatus}
         </div>
       )}
 
