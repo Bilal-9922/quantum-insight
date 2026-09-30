@@ -130,7 +130,7 @@ export default function Debugger() {
                 </div>
 
                 <p className="mt-1 text-[11px] text-slate-600">
-                  Paste the circuit that produced the error.
+                  Paste the circuit that needs debugging.
                 </p>
               </div>
 
@@ -147,6 +147,7 @@ export default function Debugger() {
             </div>
           </div>
 
+          {/* Editor toolbar */}
           <div className="flex items-center justify-between border-b border-white/5 bg-black/10 px-4 py-2">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-rose-400/60" />
@@ -201,7 +202,7 @@ export default function Debugger() {
                 </p>
 
                 <p className="mt-1 text-[11px] text-slate-600">
-                  Include the complete error when possible.
+                  Optional — include it when available.
                 </p>
               </div>
             </div>
@@ -225,15 +226,16 @@ export default function Debugger() {
 
                 <p className="text-xs leading-5 text-amber-200/70">
                   Tip: include the complete traceback or
-                  compiler message. More context gives the
-                  debugger more information to classify the
-                  problem.
+                  compiler message when possible. If you do
+                  not have an error message, you can still
+                  submit the circuit for analysis.
                 </p>
               </div>
             </div>
 
             <button
-              disabled={busy || !code.trim() || !err.trim()}
+              type="button"
+              disabled={busy || !code.trim()}
               className="btn btn-primary mt-4 w-full justify-center"
               onClick={run}
             >
@@ -296,9 +298,9 @@ export default function Debugger() {
           </p>
 
           <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-700">
-            Submit your circuit and error message to
-            classify the issue and generate a suggested
-            correction.
+            Submit your circuit with or without an error
+            message to classify the issue and generate a
+            suggested correction.
           </p>
         </div>
       )}
