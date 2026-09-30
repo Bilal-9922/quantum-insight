@@ -129,6 +129,14 @@ export function Icon({
       </>
     ),
 
+    download: (
+      <>
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+      </>
+    ),
+
     copy: (
       <>
         <rect x="9" y="9" width="11" height="11" rx="2" />
