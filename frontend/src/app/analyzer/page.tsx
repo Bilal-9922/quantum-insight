@@ -22,23 +22,78 @@ export default function Analyzer() {
   const { loading } = useRequireAuth();
 
   const [code, setCode] = useState(sample);
-  const [data, setData] = useState<Analysis | null>(
-    null
-  );
+  const [data, setData] = useState<Analysis | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [exported, setExported] = useState(false);
 
   async function run() {
     setError("");
+    setExported(false);
     setBusy(true);
 
     try {
       setData(await analyze(code));
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || "Unable to analyze the circuit.");
     } finally {
       setBusy(false);
     }
+  }
+
+  function exportReport() {
+    if (!data) return;
+
+    const report = {
+      application: "QuantumInsight",
+      report_type: "Quantum Circuit Analysis",
+      generated_at: new Date().toISOString(),
+
+      source_code: code,
+
+      metrics: {
+        qubits: data.metrics.qubits,
+        gates: data.metrics.gate_count,
+        depth: data.metrics.depth,
+        two_qubit_gates: data.metrics.two_qubit_gates,
+      },
+
+      quantum_health: {
+        score: data.health.score,
+        category: data.health.category,
+        components: data.health.components,
+      },
+
+      circuit: data.circuit,
+
+      recommendations: data.recommendations,
+    };
+
+    const blob = new Blob(
+      [JSON.stringify(report, null, 2)],
+      {
+        type: "application/json",
+      }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `quantuminsight-report-${Date.now()}.json`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    setExported(true);
+
+    window.setTimeout(() => {
+      setExported(false);
+    }, 2500);
   }
 
   if (loading) return <Loading />;
@@ -112,7 +167,12 @@ export default function Analyzer() {
 
               <button
                 type="button"
-                onClick={() => setCode(sample)}
+                onClick={() => {
+                  setCode(sample);
+                  setError("");
+                  setData(null);
+                  setExported(false);
+                }}
                 className="self-start rounded-lg border border-white/5 bg-white/[.02] px-3 py-2 text-[11px] font-bold text-cyan-300 transition hover:border-cyan-400/10 hover:bg-cyan-400/5 sm:self-auto"
               >
                 Load sample
@@ -138,9 +198,10 @@ export default function Analyzer() {
               spellCheck={false}
               className="code-editor min-h-[320px] w-full resize-y"
               value={code}
-              onChange={(e) =>
-                setCode(e.target.value)
-              }
+              onChange={(e) => {
+                setCode(e.target.value);
+                setExported(false);
+              }}
               placeholder="Paste your Qiskit circuit here..."
             />
 
@@ -296,10 +357,29 @@ export default function Analyzer() {
         </div>
       )}
 
+      {/* Export confirmation */}
+      {exported && (
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300">
+            <Icon name="check" size={16} />
+          </div>
+
+          <div>
+            <p className="font-semibold text-emerald-200">
+              Report exported
+            </p>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Your QuantumInsight analysis report has been downloaded.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Results */}
       {data && (
         <section className="space-y-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,.7)]" />
@@ -314,9 +394,20 @@ export default function Analyzer() {
               </h2>
             </div>
 
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
-              QuantumInsight analysis
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
+                QuantumInsight analysis
+              </span>
+
+              <button
+                type="button"
+                onClick={exportReport}
+                className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-cyan-300 transition hover:border-cyan-400/20 hover:bg-cyan-400/10"
+              >
+                <Icon name="copy" size={13} />
+                Export Report
+              </button>
+            </div>
           </div>
 
           {/* Metrics */}
