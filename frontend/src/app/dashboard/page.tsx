@@ -30,39 +30,45 @@ const API =
   "http://127.0.0.1:8000";
 
 const actions = [
-  [
-    "Analyzer",
-    "Measure QHI, gates, depth and anomaly signals.",
-    "/analyzer",
-    "analyze",
-  ],
-  [
-    "AI Debugger",
-    "Find common errors and generate a fix.",
-    "/debugger",
-    "bug",
-  ],
-  [
-    "Optimizer",
-    "Remove redundant operations and compare metrics.",
-    "/optimizer",
-    "zap",
-  ],
+  {
+    title: "Analyzer",
+    description:
+      "Measure QHI, gates, depth and anomaly signals.",
+    href: "/analyzer",
+    icon: "analyze",
+    number: "01",
+  },
+  {
+    title: "AI Debugger",
+    description:
+      "Find common quantum errors and generate a fix.",
+    href: "/debugger",
+    icon: "bug",
+    number: "02",
+  },
+  {
+    title: "Optimizer",
+    description:
+      "Remove redundant operations and compare metrics.",
+    href: "/optimizer",
+    icon: "zap",
+    number: "03",
+  },
 ];
 
 export default function Dashboard() {
   const { user, loading } = useRequireAuth();
 
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] =
+    useState(true);
 
   const [showResetConfirm, setShowResetConfirm] =
     useState(false);
 
   const [resetting, setResetting] = useState(false);
 
-  const [resetStatus, setResetStatus] =
-    useState("");
+  const [resetStatus, setResetStatus] = useState("");
 
   useEffect(() => {
     if (loading || !user) return;
@@ -149,13 +155,7 @@ export default function Dashboard() {
         );
       }
 
-      /*
-       * Clear the local dashboard state immediately.
-       * Because the dashboard metrics are calculated
-       * from this state, all metrics reset automatically.
-       */
       setHistory([]);
-
       setShowResetConfirm(false);
 
       setResetStatus(
@@ -182,8 +182,11 @@ export default function Dashboard() {
 
   if (loading || !user) {
     return (
-      <div className="py-20 text-center text-slate-500">
-        Loading workspace…
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex items-center gap-3 text-sm text-slate-500">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+          Loading workspace…
+        </div>
       </div>
     );
   }
@@ -220,57 +223,95 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-7">
-      <section className="relative overflow-hidden rounded-3xl border border-cyan-400/10 bg-gradient-to-br from-cyan-500/[.10] via-slate-950/40 to-violet-600/[.12] p-6 sm:p-8">
-        <div className="absolute right-[-60px] top-[-100px] h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-3xl border border-cyan-400/10 bg-gradient-to-br from-cyan-500/[.10] via-slate-950/60 to-violet-600/[.12] p-6 shadow-[0_20px_80px_rgba(0,0,0,.18)] sm:p-8 lg:p-9">
+        <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
-        <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <div>
-            <p className="section-kicker">
-              Overview
-            </p>
+        <div className="pointer-events-none absolute -bottom-32 left-1/3 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl" />
 
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-              Welcome back, {user.name.split(" ")[0]}.
-            </h1>
+        <div className="relative">
+          <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,.8)]" />
 
-            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
-              Your quantum workspace is ready.
-              Choose a workflow below or open the analyzer
-              to inspect a circuit.
-            </p>
+                <p className="section-kicker">
+                  Quantum workspace
+                </p>
+              </div>
+
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[42px]">
+                Welcome back,{" "}
+                <span className="text-cyan-300">
+                  {user.name.split(" ")[0]}.
+                </span>
+              </h1>
+
+              <p className="mt-4 max-w-xl text-sm leading-7 text-slate-400">
+                Analyze, debug and optimize your quantum
+                circuits from one intelligent workspace.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Link
+                href="/analyzer"
+                className="btn btn-primary shrink-0"
+              >
+                <Icon name="zap" size={15} />
+                New circuit analysis
+                <Icon name="arrow" size={15} />
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setResetStatus("");
+                  setShowResetConfirm(true);
+                }}
+                disabled={history.length === 0}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/5 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Icon name="trash" size={15} />
+                Reset Data
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Link
-              href="/analyzer"
-              className="btn btn-primary shrink-0"
-            >
-              New circuit analysis
-              <Icon name="arrow" size={15} />
-            </Link>
+          {/* Hero footer */}
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-white/5 pt-5 text-[11px] text-slate-600">
+            <span>
+              Personal quantum workspace
+            </span>
 
-            <button
-              type="button"
-              onClick={() => {
-                setResetStatus("");
-                setShowResetConfirm(true);
-              }}
-              disabled={history.length === 0}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/5 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-200 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Icon name="trash" size={15} />
-              Reset Data
-            </button>
+            <span className="hidden h-1 w-1 rounded-full bg-slate-700 sm:block" />
+
+            <span>
+              {analyses} saved{" "}
+              {analyses === 1 ? "analysis" : "analyses"}
+            </span>
+
+            <span className="hidden h-1 w-1 rounded-full bg-slate-700 sm:block" />
+
+            <span className="text-cyan-400/60">
+              AI-assisted analysis
+            </span>
           </div>
         </div>
       </section>
 
+      {/* Reset status */}
       {resetStatus && (
-        <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-sm text-cyan-300">
+        <div className="flex items-center gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-sm text-cyan-300">
+          <span className="grid h-6 w-6 place-items-center rounded-full bg-cyan-400/10">
+            <Icon name="check" size={14} />
+          </span>
+
           {resetStatus}
         </div>
       )}
 
+      {/* Metrics */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="QHI average"
@@ -283,9 +324,10 @@ export default function Dashboard() {
           }
           note={
             averageQHI !== null
-              ? "Across your saved analyses"
+              ? "Across saved analyses"
               : "Run an analysis to calculate"
           }
+          icon="spark"
         />
 
         <Metric
@@ -296,6 +338,7 @@ export default function Dashboard() {
               : String(analyses)
           }
           note="Saved workspace analyses"
+          icon="history"
         />
 
         <Metric
@@ -312,6 +355,7 @@ export default function Dashboard() {
               ? "Average anomaly score"
               : "Awaiting circuit data"
           }
+          icon="bug"
         />
 
         <Metric
@@ -328,117 +372,155 @@ export default function Dashboard() {
               ? history[0].health_category
               : "No analysis yet"
           }
+          icon="analyze"
         />
       </section>
 
+      {/* Main dashboard grid */}
       <section className="grid gap-5 xl:grid-cols-[1.6fr_.8fr]">
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
+        {/* Workflows */}
+        <div className="card p-6 sm:p-7">
+          <div className="flex items-start justify-between gap-4">
             <div>
               <p className="section-kicker">
                 Workflows
               </p>
 
-              <h2 className="mt-1 text-xl font-bold">
+              <h2 className="mt-1 text-xl font-bold text-white">
                 Choose your next move
               </h2>
+
+              <p className="mt-1 text-xs text-slate-600">
+                Select a tool to continue working with your
+                quantum circuits.
+              </p>
             </div>
 
-            <span className="badge text-slate-400">
+            <span className="badge shrink-0 text-slate-400">
               3 tools
             </span>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {actions.map(
-              ([title, desc, href, icon]) => (
-                <Link
-                  key={title}
-                  href={href}
-                  className="card card-hover group p-5"
-                >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300">
-                    <Icon name={icon} />
-                  </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {actions.map((action) => (
+              <Link
+                key={action.title}
+                href={action.href}
+                className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/[.018] p-5 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-400/15 hover:bg-cyan-400/[.025]"
+              >
+                <div className="absolute right-4 top-4 text-[10px] font-bold tracking-widest text-slate-700 transition group-hover:text-cyan-400/50">
+                  {action.number}
+                </div>
 
-                  <h3 className="mt-5 font-bold">
-                    {title}
-                  </h3>
+                <div className="grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/10 bg-cyan-400/10 text-cyan-300 transition group-hover:border-cyan-400/20 group-hover:bg-cyan-400/15">
+                  <Icon
+                    name={action.icon}
+                    size={19}
+                  />
+                </div>
 
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    {desc}
-                  </p>
+                <h3 className="mt-5 font-bold text-white">
+                  {action.title}
+                </h3>
 
-                  <span className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-cyan-300">
-                    Open
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  {action.description}
+                </p>
+
+                <div className="mt-5 flex items-center gap-2 text-xs font-bold text-cyan-300">
+                  Open workflow
+                  <span className="transition-transform group-hover:translate-x-1">
                     <Icon name="arrow" size={13} />
                   </span>
-                </Link>
-              )
-            )}
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
 
-        <div className="card p-6">
-          <p className="section-kicker">
-            Quantum Health Index
-          </p>
+        {/* QHI */}
+        <div className="card relative overflow-hidden p-6 sm:p-7">
+          <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/5 blur-3xl" />
 
-          <div className="mt-6 flex justify-center">
-            <div
-              className="grid h-44 w-44 place-items-center rounded-full"
-              style={{
-                background:
-                  averageQHI !== null
-                    ? `conic-gradient(#22d3ee 0deg, #6366f1 ${
-                        qhiProgress * 3.6
-                      }deg, rgba(255,255,255,.07) ${
-                        qhiProgress * 3.6
-                      }deg)`
-                    : "conic-gradient(#22d3ee 0deg, #6366f1 0deg, rgba(255,255,255,.07) 0deg)",
-              }}
-            >
-              <div className="grid h-36 w-36 place-items-center rounded-full bg-slate-950">
-                <div className="text-center">
-                  <div className="text-4xl font-black">
-                    {historyLoading
-                      ? "…"
-                      : averageQHI !== null
-                      ? averageQHI.toFixed(1)
-                      : "—"}
-                  </div>
+          <div className="relative">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="section-kicker">
+                  Quantum Health Index
+                </p>
 
-                  <div className="mt-1 text-[10px] uppercase tracking-widest text-slate-500">
-                    {averageQHI !== null
-                      ? "Average QHI"
-                      : "No score yet"}
+                <h2 className="mt-1 text-xl font-bold">
+                  Overall health
+                </h2>
+              </div>
+
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-400/5 text-cyan-300">
+                <Icon name="shield" size={16} />
+              </div>
+            </div>
+
+            <div className="mt-7 flex justify-center">
+              <div
+                className="relative grid h-44 w-44 place-items-center rounded-full"
+                style={{
+                  background:
+                    averageQHI !== null
+                      ? `conic-gradient(#22d3ee 0deg, #6366f1 ${
+                          qhiProgress * 3.6
+                        }deg, rgba(255,255,255,.07) ${
+                          qhiProgress * 3.6
+                        }deg)`
+                      : "conic-gradient(rgba(255,255,255,.07) 0deg, rgba(255,255,255,.07) 360deg)",
+                }}
+              >
+                <div className="absolute inset-[3px] rounded-full bg-slate-950/80" />
+
+                <div className="relative grid h-36 w-36 place-items-center rounded-full border border-white/5 bg-slate-950">
+                  <div className="text-center">
+                    <div className="text-4xl font-black tracking-tight">
+                      {historyLoading
+                        ? "…"
+                        : averageQHI !== null
+                        ? averageQHI.toFixed(1)
+                        : "—"}
+                    </div>
+
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-600">
+                      {averageQHI !== null
+                        ? "Average QHI"
+                        : "No score yet"}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <p className="mt-5 text-center text-xs leading-5 text-slate-500">
-            {averageQHI !== null
-              ? "Based on your saved circuit analyses."
-              : "Analyze your first circuit to populate the six QHI components."}
-          </p>
+            <div className="mt-6 rounded-xl border border-white/5 bg-white/[.02] px-4 py-3 text-center">
+              <p className="text-xs leading-5 text-slate-500">
+                {averageQHI !== null
+                  ? "Based on your saved circuit analyses."
+                  : "Analyze your first circuit to populate your QHI."}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="card p-6">
-        <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-violet-400/10 text-violet-300">
+      {/* QHI components */}
+      <section className="card p-6 sm:p-7">
+        <div className="flex items-start gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-400/10 text-violet-300">
             <Icon name="spark" />
           </div>
 
           <div>
-            <h2 className="font-bold">
+            <h2 className="font-bold text-white">
               How QuantumInsight evaluates a circuit
             </h2>
 
-            <p className="text-xs text-slate-500">
-              The analyzer combines engineering metrics with ML signals.
+            <p className="mt-1 text-xs text-slate-500">
+              The analyzer combines engineering metrics
+              with ML signals.
             </p>
           </div>
         </div>
@@ -451,75 +533,88 @@ export default function Dashboard() {
             "2-qubit gate efficiency",
             "Noise exposure",
             "Optimization potential",
-          ].map((x, i) => (
+          ].map((item, index) => (
             <div
-              key={x}
-              className="rounded-xl border border-white/5 bg-white/[.02] p-4"
+              key={item}
+              className="group rounded-xl border border-white/5 bg-white/[.018] p-4 transition hover:border-cyan-400/10 hover:bg-white/[.025]"
             >
-              <span className="text-[10px] font-bold text-cyan-300">
-                0{i + 1}
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold tracking-widest text-cyan-300/80">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
 
-              <p className="mt-2 text-sm font-semibold">
-                {x}
+                <span className="text-[9px] uppercase tracking-widest text-slate-700">
+                  Signal
+                </span>
+              </div>
+
+              <p className="mt-3 text-sm font-semibold text-slate-200">
+                {item}
               </p>
 
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
-                <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500" />
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/5">
+                <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 transition-all group-hover:w-3/4" />
               </div>
             </div>
           ))}
         </div>
       </section>
 
+      {/* Reset modal */}
       {showResetConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
-            <div className="flex items-start gap-4">
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
-                <Icon name="trash" size={20} />
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-2xl">
+            <div className="border-b border-white/5 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
+                  <Icon name="trash" size={20} />
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-bold text-white">
+                    Reset dashboard data?
+                  </h2>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    This will permanently delete all your
+                    saved analysis history and reset the
+                    dashboard metrics.
+                  </p>
+                </div>
               </div>
+            </div>
 
-              <div>
-                <h2 className="text-lg font-bold text-white">
-                  Reset dashboard data?
-                </h2>
-
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  This will permanently delete all your
-                  saved analysis history and reset the
-                  dashboard metrics to their empty state.
-                </p>
-
-                <p className="mt-3 text-xs leading-5 text-slate-600">
+            <div className="px-6 py-5">
+              <div className="rounded-xl border border-white/5 bg-white/[.02] px-4 py-3">
+                <p className="text-xs leading-5 text-slate-600">
                   Your account, profile and authentication
                   will not be affected.
                 </p>
               </div>
-            </div>
 
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowResetConfirm(false)
-                }
-                disabled={resetting}
-                className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
+              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowResetConfirm(false)
+                  }
+                  disabled={resetting}
+                  className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
 
-              <button
-                type="button"
-                onClick={resetDashboardData}
-                disabled={resetting}
-                className="rounded-xl bg-rose-500/90 px-4 py-2 text-sm font-bold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {resetting
-                  ? "Resetting..."
-                  : "Reset Dashboard"}
-              </button>
+                <button
+                  type="button"
+                  onClick={resetDashboardData}
+                  disabled={resetting}
+                  className="rounded-xl bg-rose-500/90 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {resetting
+                    ? "Resetting..."
+                    : "Reset Dashboard"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -532,16 +627,24 @@ function Metric({
   label,
   value,
   note,
+  icon,
 }: {
   label: string;
   value: string;
   note: string;
+  icon: string;
 }) {
   return (
-    <div className="metric">
-      <p className="text-xs font-bold text-slate-500">
-        {label}
-      </p>
+    <div className="metric group relative overflow-hidden">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-slate-500">
+          {label}
+        </p>
+
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/[.03] text-slate-600 transition group-hover:bg-cyan-400/10 group-hover:text-cyan-300">
+          <Icon name={icon} size={15} />
+        </span>
+      </div>
 
       <p className="metric-value mt-3">
         {value}
