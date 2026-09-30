@@ -1,4 +1,6 @@
 import ast
+import tokenize
+from io import StringIO
 
 
 def generate_patch(code, error=None):
@@ -12,6 +14,33 @@ def generate_patch(code, error=None):
     original_code = code or ""
     message = str(error or "").strip()
     text = message.lower()
+
+    # ---------------------------------------------------------
+    # Syntax errors
+    # ---------------------------------------------------------
+
+    is_syntax_error = (
+        "syntaxerror" in text
+        or "invalid syntax" in text
+        or "was never closed" in text
+        or "unexpected eof" in text
+        or "unexpected end of input" in text
+    )
+
+    if is_syntax_error:
+        syntax_patch = _handle_syntax_error(original_code)
+
+        if syntax_patch is not None:
+            return syntax_patch
+
+        return {
+            "fixed_code": original_code,
+            "changed": False,
+            "note": (
+                "A syntax error was detected, but the debugger could "
+                "not determine a safe structural correction."
+            ),
+        }
 
     # ---------------------------------------------------------
     # Qubit index errors
@@ -41,6 +70,84 @@ def generate_patch(code, error=None):
             "No safe automatic patch was generated. "
             "The debugger only rewrites code when the "
             "correction can be determined reliably."
+        ),
+    }
+
+
+def _handle_syntax_error(code):
+    """
+    Safely repair a simple missing closing delimiter.
+
+    The function only patches code when tokenization shows that
+    parentheses, brackets, or braces are left open.
+
+    It does not attempt to rewrite arbitrary Python syntax.
+    """
+
+    try:
+        tokens = list(
+            tokenize.generate_tokens(
+                StringIO(code).readline
+            )
+        )
+    except (tokenize.TokenError, IndentationError):
+        # Tokenization can still fail for an unfinished string.
+        # Do not guess how to repair it.
+        return None
+
+    opening = {
+        "(": ")",
+        "[": "]",
+        "{": "}",
+    }
+
+    closing = {
+        ")": "(",
+        "]": "[",
+        "}": "{",
+    }
+
+    stack = []
+
+    for token in tokens:
+        value = token.string
+
+        if value in opening:
+            stack.append(value)
+
+        elif value in closing:
+            if not stack:
+                return None
+
+            if stack[-1] != closing[value]:
+                return None
+
+            stack.pop()
+
+    # Nothing is structurally unclosed.
+    if not stack:
+        return None
+
+    # Only append the required closing delimiters.
+    missing = "".join(
+        opening[item]
+        for item in reversed(stack)
+    )
+
+    fixed_code = code.rstrip() + missing + "\n"
+
+    # Make sure the generated code is actually valid Python.
+    try:
+        ast.parse(fixed_code)
+    except SyntaxError:
+        return None
+
+    return {
+        "fixed_code": fixed_code,
+        "changed": True,
+        "note": (
+            "The debugger detected an unclosed Python delimiter "
+            "and safely added the required closing delimiter(s)."
         ),
     }
 
