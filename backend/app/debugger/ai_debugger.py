@@ -1,12 +1,11 @@
 def diagnose(code, error=None):
     """
-    Generate a circuit-specific diagnosis based on the
-    reported error message and the submitted Qiskit code.
+    Generate a circuit-specific diagnosis based on
+    the supplied error message.
     """
 
     message = str(error or "").strip()
     text = message.lower()
-    source = code or ""
 
     # ---------------------------------------------------------
     # Syntax errors
@@ -19,18 +18,18 @@ def diagnose(code, error=None):
         or "was never closed" in text
         or "unexpected eof" in text
     ):
-    return {
-        "diagnosis": (
-            "The submitted Python/Qiskit code contains a syntax "
-            "error and cannot be parsed correctly."
-        ),
-        "suggestions": [
-            "Check that all parentheses, brackets, and braces are properly closed.",
-            "Inspect the line reported by the Python syntax error.",
-            "Verify that each Qiskit gate call has the correct opening and closing parentheses.",
-        ],
-    }
-    
+        return {
+            "diagnosis": (
+                "The submitted Python/Qiskit code contains a syntax "
+                "error and cannot be parsed correctly."
+            ),
+            "suggestions": [
+                "Check that all parentheses, brackets, and braces are properly closed.",
+                "Inspect the line reported by the Python syntax error.",
+                "Verify that each Qiskit gate call has the correct opening and closing parentheses.",
+            ],
+        }
+
     # ---------------------------------------------------------
     # Qubit index errors
     # ---------------------------------------------------------
@@ -45,8 +44,8 @@ def diagnose(code, error=None):
     ):
         return {
             "diagnosis": (
-                "A gate references a qubit index that is outside the "
-                "available circuit range."
+                "A gate references a qubit index that is outside "
+                "the available circuit range."
             ),
             "suggestions": [
                 "Check the QuantumCircuit qubit count.",
@@ -90,12 +89,12 @@ def diagnose(code, error=None):
     ):
         return {
             "diagnosis": (
-                "The circuit contains a gate that Qiskit cannot recognize "
-                "or does not support in the current context."
+                "The circuit contains a gate that Qiskit cannot "
+                "recognize or does not support in the current context."
             ),
             "suggestions": [
                 "Check the gate name for spelling mistakes.",
-                "Verify that the required Qiskit gate is imported or available.",
+                "Verify that the required Qiskit gate is available.",
                 "Replace unsupported operations with a supported equivalent.",
             ],
         }
@@ -111,8 +110,8 @@ def diagnose(code, error=None):
     ):
         return {
             "diagnosis": (
-                "The submitted code depends on a Python module or import "
-                "that is not available in the execution environment."
+                "The submitted code depends on a Python module or "
+                "import that is not available in the execution environment."
             ),
             "suggestions": [
                 "Check the module name and import statement.",
@@ -132,8 +131,8 @@ def diagnose(code, error=None):
     ):
         return {
             "diagnosis": (
-                "Qiskit rejected an operation while constructing or "
-                "modifying the circuit."
+                "Qiskit rejected an operation while constructing "
+                "or modifying the circuit."
             ),
             "suggestions": [
                 "Check the gate arguments and target qubits.",
