@@ -31,6 +31,9 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class GoogleLoginRequest(BaseModel):
+    access_token: str
+
 
 class ForgotPasswordRequest(BaseModel):
     email: str
@@ -82,6 +85,88 @@ def me(user=Depends(current_user)):
     return {
         "user": user,
     }
+
+
+@router.post("/auth/google")
+def google_login(req: GoogleLoginRequest):
+    try:
+        google_response = supabase.auth.get_user(req.access_token)
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Google authentication.",
+        )
+
+    if not google_response or not google_response.user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Google authentication.",
+        )
+
+    google_user = google_response.user
+
+    email = (google_user.email or "").strip().lower()
+
+    if not email:
+        raise HTTPException(
+            status_code=400,
+            detail="Google account does not have an email address.",
+        )
+
+    metadata = google_user.user_metadata or {}
+
+    name = (
+        metadata.get("full_name")
+        or metadata.get("name")
+        or email.split("@")[0]
+    ).strip()
+
+    response = (
+        supabase
+        .table("users")
+        .select("*")
+        .eq("email", email)
+        .limit(1)
+        .execute()
+    )
+
+    if response.data:
+        user = response.data[0]
+    else:
+        response = (
+            supabase
+            .table("users")
+            .insert(
+                {
+                    "name": name,
+                    "email": email,
+                    "password_hash": "",
+                    "salt": "",
+                }
+            )
+            .execute()
+        )
+
+        if not response.data:
+            raise HTTPException(
+                status_code=500,
+                detail="Unable to create Google account.",
+            )
+
+        user = response.data[0]
+
+    user = {
+        "id": user["id"],
+        "name": user["name"],
+        "email": user["email"],
+        "created_at": user["created_at"],
+    }
+
+    return {
+        "user": user,
+        "token": create_token(user),
+    }
+
 
 
 @router.post("/auth/forgot-password")
