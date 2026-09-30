@@ -55,41 +55,61 @@ def recommend(analysis):
     recommendations = []
 
     # ---------------------------------------------------------
-    # Two-qubit operations
-    # ---------------------------------------------------------
+# Two-qubit operations
+# ---------------------------------------------------------
 
-    if two_qubit_gates <= 1 and gates <= 5:
-        recommendations.append(
-            f"The circuit contains {two_qubit_gates} "
-            "entangling operation in a very small workload. "
-            "This is not necessarily an issue; preserve it "
-            "unless backend constraints or transpilation "
-            "introduce additional overhead."
-        )
+if cancellation_opportunities > 0:
 
-    elif two_qubit_ratio >= 0.75:
-        recommendations.append(
-            f"Two-qubit operations are very high "
-            f"({two_qubit_ratio * 100:.1f}% of gates). "
-            "Review CX, CZ, and SWAP sequences for possible "
-            "cancellation, fusion, or restructuring."
-        )
+    plural = (
+        "opportunity"
+        if cancellation_opportunities == 1
+        else "opportunities"
+    )
 
-    elif two_qubit_ratio >= 0.50:
-        recommendations.append(
-            f"Two-qubit operations make up "
-            f"{two_qubit_ratio * 100:.1f}% of gates. "
-            "For larger circuits, review entangling sequences "
-            "for unnecessary operations and possible cancellation."
-        )
+    recommendations.append(
+        f"Detected {cancellation_opportunities} adjacent "
+        f"gate cancellation {plural}. Review repeated "
+        "self-inverse gates such as CX, X, H, or similar "
+        "operations because they may cancel and reduce "
+        "circuit complexity."
+    )
 
-    elif two_qubit_ratio >= 0.25:
-        recommendations.append(
-            f"The circuit contains a moderate two-qubit gate ratio "
-            f"({two_qubit_ratio * 100:.1f}%). "
-            "Check whether neighboring entangling operations "
-            "can be simplified or cancelled."
-        )
+elif two_qubit_gates <= 1 and gates <= 5:
+
+    recommendations.append(
+        f"The circuit contains {two_qubit_gates} "
+        "entangling operation in a very small workload. "
+        "This is not necessarily an issue; preserve it "
+        "unless backend constraints or transpilation "
+        "introduce additional overhead."
+    )
+
+elif two_qubit_ratio >= 0.75:
+
+    recommendations.append(
+        f"Two-qubit operations are very high "
+        f"({two_qubit_ratio * 100:.1f}% of gates). "
+        "Review CX, CZ, and SWAP sequences for possible "
+        "cancellation, fusion, or restructuring."
+    )
+
+elif two_qubit_ratio >= 0.50:
+
+    recommendations.append(
+        f"Two-qubit operations make up "
+        f"{two_qubit_ratio * 100:.1f}% of gates. "
+        "For larger circuits, review entangling sequences "
+        "for unnecessary operations and possible cancellation."
+    )
+
+elif two_qubit_ratio >= 0.25:
+
+    recommendations.append(
+        f"The circuit contains a moderate two-qubit gate ratio "
+        f"({two_qubit_ratio * 100:.1f}%). "
+        "Check whether neighboring entangling operations "
+        "can be simplified or cancelled."
+    )
 
     # ---------------------------------------------------------
     # Circuit depth
