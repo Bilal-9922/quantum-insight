@@ -44,3 +44,33 @@ def get_history(
             status_code=500,
             detail=f"Failed to load analysis history: {str(e)}",
         )
+
+
+@router.delete("/history")
+def delete_history(
+    user=Depends(authenticated_user),
+):
+    try:
+        user_id = user["id"]
+
+        result = (
+            supabase
+            .table("analysis_history")
+            .delete()
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        deleted_count = len(result.data or [])
+
+        return {
+            "success": True,
+            "message": "Analysis history deleted successfully.",
+            "deleted_count": deleted_count,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete analysis history: {str(e)}",
+        )
