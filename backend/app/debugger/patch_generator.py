@@ -30,7 +30,7 @@ def generate_patch(code, error=None):
     text = message.lower()
 
     # ---------------------------------------------------------
-    # Indentation error auto-fix
+    # Indentation error
     # ---------------------------------------------------------
 
     indentation_patch = _handle_indentation_error(
@@ -42,7 +42,7 @@ def generate_patch(code, error=None):
         return indentation_patch
 
     # ---------------------------------------------------------
-    # Syntax error auto-fix
+    # Syntax error
     # ---------------------------------------------------------
 
     syntax_patch = _handle_syntax_error(
@@ -54,7 +54,7 @@ def generate_patch(code, error=None):
         return syntax_patch
 
     # ---------------------------------------------------------
-    # Wrong gate-name auto-fix
+    # Wrong gate-name error
     # ---------------------------------------------------------
 
     gate_patch = _handle_gate_name_error(
@@ -66,7 +66,7 @@ def generate_patch(code, error=None):
         return gate_patch
 
     # ---------------------------------------------------------
-    # Qubit index errors
+    # Qubit index error
     # ---------------------------------------------------------
 
     is_qubit_error = (
@@ -242,6 +242,16 @@ def _handle_gate_name_error(code, error_message):
             f"'{first_change[1]}' and replaced it with the "
             f"supported Qiskit gate '{first_change[2]}'."
         ),
+        "suggested_fix": {
+            "gate": first_change[1],
+            "replacement": first_change[2],
+            "line": first_change[0],
+            "code": fixed_code,
+            "warning": (
+                "Review the replacement before using the "
+                "corrected circuit."
+            ),
+        },
     }
 
 
@@ -351,6 +361,15 @@ def _handle_indentation_error(code, error_message):
                             "and automatically indented the "
                             "statement by four spaces."
                         ),
+                        "suggested_fix": {
+                            "line": error_line,
+                            "code": fixed_code,
+                            "warning": (
+                                "Review the indentation because "
+                                "Python block structure determines "
+                                "program execution."
+                            ),
+                        },
                     }
 
     # ---------------------------------------------------------
@@ -425,6 +444,14 @@ def _handle_indentation_error(code, error_message):
                 "and automatically indented the following "
                 "statement by four spaces."
             ),
+            "suggested_fix": {
+                "line": index + 2,
+                "code": fixed_code,
+                "warning": (
+                    "Review the indentation before running "
+                    "the corrected circuit."
+                ),
+            },
         }
 
     return None
@@ -437,6 +464,14 @@ def _handle_indentation_error(code, error_message):
 def _handle_syntax_error(code, error_message):
     """
     Safely fix one missing closing delimiter.
+
+    Example:
+
+        qc.h(0
+
+    becomes:
+
+        qc.h(0)
     """
 
     if not code.strip():
@@ -453,13 +488,14 @@ def _handle_syntax_error(code, error_message):
     combined_message = (
         parser_message
         + " "
-        + error_message.lower()
+        + str(error_message or "").lower()
     )
 
     if (
         "was never closed" not in combined_message
         and "eof while parsing" not in combined_message
         and "unexpected eof" not in combined_message
+        and "unexpected end of file" not in combined_message
     ):
         return None
 
@@ -549,6 +585,16 @@ def _handle_syntax_error(code, error_message):
             f"and automatically added the missing "
             f"'{closing}'."
         ),
+        "suggested_fix": {
+            "line": error_line,
+            "delimiter": closing,
+            "code": fixed_code,
+            "warning": (
+                f"The debugger inferred that the closing "
+                f"'{closing}' was missing. Review the "
+                "corrected line before running the circuit."
+            ),
+        },
     }
 
 
