@@ -56,6 +56,10 @@ export default function History() {
   const [copyStatus, setCopyStatus] = useState("");
   const [exportStatus, setExportStatus] = useState("");
   const [deleteStatus, setDeleteStatus] = useState("");
+
+  const [selectedAnalyses, setSelectedAnalyses] =
+    useState<number[]>([]);
+
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] =
     useState(false);
@@ -109,6 +113,26 @@ export default function History() {
 
     loadHistory();
   }, [authLoading]);
+
+  function toggleAnalysisSelection(id: number) {
+    setSelectedAnalyses((current) => {
+      if (current.includes(id)) {
+        return current.filter(
+          (selectedId) => selectedId !== id
+        );
+      }
+
+      if (current.length >= 2) {
+        return current;
+      }
+
+      return [...current, id];
+    });
+  }
+
+  function clearSelection() {
+    setSelectedAnalyses([]);
+  }
 
   async function copyHistory() {
     if (history.length === 0) {
@@ -348,6 +372,7 @@ export default function History() {
       }
 
       setHistory([]);
+      setSelectedAnalyses([]);
       setShowDeleteConfirm(false);
 
       setDeleteStatus(
@@ -463,6 +488,55 @@ export default function History() {
           )}
         </div>
       </section>
+
+      {/* Comparison toolbar */}
+      {history.length > 0 && (
+        <section className="rounded-2xl border border-violet-400/10 bg-violet-400/[.035] p-4 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-400/10 text-violet-300">
+                <Icon name="analyze" size={16} />
+              </div>
+
+              <div>
+                <p className="text-sm font-bold text-white">
+                  Compare analyses
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Select up to two saved analyses to compare
+                  their quantum health metrics.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-slate-500">
+                {selectedAnalyses.length}/2 selected
+              </span>
+
+              {selectedAnalyses.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
+                >
+                  Clear
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={selectedAnalyses.length !== 2}
+                className="inline-flex items-center gap-2 rounded-lg bg-violet-400/10 px-3.5 py-2 text-xs font-bold text-violet-300 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Compare
+                <Icon name="arrow" size={13} />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Status messages */}
       {copyStatus &&
@@ -582,6 +656,14 @@ export default function History() {
               key={item.id}
               item={item}
               index={index}
+              selected={selectedAnalyses.includes(item.id)}
+              selectionDisabled={
+                selectedAnalyses.length >= 2 &&
+                !selectedAnalyses.includes(item.id)
+              }
+              onToggle={() =>
+                toggleAnalysisSelection(item.id)
+              }
             />
           ))}
         </section>
@@ -653,9 +735,15 @@ export default function History() {
 function HistoryCard({
   item,
   index,
+  selected,
+  selectionDisabled,
+  onToggle,
 }: {
   item: HistoryItem;
   index: number;
+  selected: boolean;
+  selectionDisabled: boolean;
+  onToggle: () => void;
 }) {
   const qhi = Number(item.health_score || 0);
 
@@ -665,14 +753,44 @@ function HistoryCard({
   );
 
   return (
-    <article className="card group overflow-hidden transition hover:border-cyan-400/10">
+    <article
+      className={`card group overflow-hidden transition ${
+        selected
+          ? "border-violet-400/30 bg-violet-400/[.025] shadow-[0_0_30px_rgba(139,92,246,.08)]"
+          : "hover:border-cyan-400/10"
+      }`}
+    >
       {/* Main header */}
       <div className="relative p-5 sm:p-6">
-        <div className="absolute right-5 top-5 text-[10px] font-bold tracking-[0.18em] text-slate-700">
-          #{String(index + 1).padStart(2, "0")}
+        <div className="absolute right-5 top-5 flex items-center gap-3">
+          <label
+            className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 transition ${
+              selectionDisabled
+                ? "cursor-not-allowed border-white/5 bg-white/[.01] opacity-40"
+                : selected
+                ? "border-violet-400/20 bg-violet-400/10"
+                : "border-white/10 bg-white/[.02] hover:border-violet-400/20 hover:bg-violet-400/5"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              disabled={selectionDisabled}
+              onChange={onToggle}
+              className="h-3.5 w-3.5 accent-violet-400"
+            />
+
+            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+              Compare
+            </span>
+          </label>
+
+          <span className="text-[10px] font-bold tracking-[0.18em] text-slate-700">
+            #{String(index + 1).padStart(2, "0")}
+          </span>
         </div>
 
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-5 pr-28 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-300">
@@ -682,6 +800,12 @@ function HistoryCard({
               <span className="rounded-lg border border-white/5 bg-white/[.03] px-2.5 py-1 text-[10px] font-semibold text-slate-500">
                 {item.health_category}
               </span>
+
+              {selected && (
+                <span className="rounded-lg border border-violet-400/15 bg-violet-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-violet-300">
+                  Selected
+                </span>
+              )}
             </div>
 
             <p className="mt-3 text-xs text-slate-600">
