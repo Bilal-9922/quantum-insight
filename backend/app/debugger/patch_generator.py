@@ -20,6 +20,27 @@ GATE_ALIASES = {
 }
 
 
+# -------------------------------------------------------------
+# Gates that commonly accept numeric parameters
+# -------------------------------------------------------------
+
+PARAMETERIZED_GATES = {
+    "rx",
+    "ry",
+    "rz",
+    "p",
+    "u",
+    "u1",
+    "u2",
+    "u3",
+    "r",
+    "cu",
+    "crx",
+    "cry",
+    "crz",
+}
+
+
 def generate_patch(code, error=None):
     """
     Generate safe deterministic patches for simple Qiskit errors.
@@ -54,6 +75,18 @@ def generate_patch(code, error=None):
         return syntax_patch
 
     # ---------------------------------------------------------
+    # Parameter error
+    # ---------------------------------------------------------
+
+    parameter_patch = _handle_parameter_error(
+        original_code,
+        message,
+    )
+
+    if parameter_patch is not None:
+        return parameter_patch
+
+    # ---------------------------------------------------------
     # Wrong gate-name error
     # ---------------------------------------------------------
 
@@ -74,6 +107,8 @@ def generate_patch(code, error=None):
         or "out of range for size" in text
         or "invalid qubit index" in text
         or "qubit index" in text
+        or "qarg" in text
+        or "qargs" in text
     )
 
     if is_qubit_error:
@@ -95,6 +130,283 @@ def generate_patch(code, error=None):
             "correction can be determined reliably."
         ),
     }
+
+
+# =============================================================
+# PARAMETER ERROR
+# =============================================================
+
+def _handle_parameter_error(code, error_message):
+    """
+    Handle simple invalid parameters in parameterized Qiskit gates.
+
+    This intentionally only suggests a correction when an obviously
+    non-numeric literal is being passed to a gate that expects a
+    numeric parameter.
+
+    Example:
+
+        qc.ry("invalid", 0)
+
+    Suggested:
+
+        qc.ry(0.0, 0)
+
+    The suggestion is not automatically applied because replacing a
+    parameter changes the mathematical behavior of the circuit.
+    """
+
+    if not code.strip():
+        return None
+
+    message = str(error_message or "").lower()
+
+    parameter_error = (
+        "invalid parameter" in message
+        or "parameter error" in message
+        or "invalid parameter value" in message
+        or "invalid value for parameter" in message
+        or "parameter is invalid" in message
+        or "invalid rotation" in message
+        or "invalid angle" in message
+        or "invalid phase" in message
+        or "parameter must be" in message
+        or "cannot bind" in message
+        or "expected a numeric" in message
+        or "numeric parameter" in message
+    )
+
+    if not parameter_error:
+        return None
+
+    try:
+        tree = ast.parse(code)
+
+    except SyntaxError:
+        return None
+
+    candidate = _find_invalid_parameter(tree)
+
+    if candidate is None:
+        return {
+            "fixed_code": code,
+            "changed": False,
+            "note": (
+                "A parameter error was detected, but the debugger "
+                "could not identify a safe literal parameter to "
+                "replace automatically."
+            ),
+        }
+
+    (
+        gate_name,
+        line_number,
+        parameter_index,
+        parameter_value,
+    ) = candidate
+
+    lines = code.splitlines()
+
+    index = line_number - 1
+
+    if index < 0 or index >= len(lines):
+        return None
+
+    line = lines[index]
+
+    replacement = "0.0"
+
+    new_line = _replace_parameter_on_line(
+        line,
+        parameter_value,
+        replacement,
+        parameter_index,
+    )
+
+    if new_line is None:
+        return {
+            "fixed_code": code,
+            "changed": False,
+            "note": (
+                f"The parameter error affects gate '{gate_name}' "
+                f"on line {line_number}, but the debugger could "
+                "not safely construct a replacement."
+            ),
+        }
+
+    lines[index] = new_line
+
+    fixed_code = "\n".join(lines)
+
+    if code.endswith("\n"):
+        fixed_code += "\n"
+
+    try:
+        ast.parse(fixed_code)
+
+    except SyntaxError:
+        return {
+            "fixed_code": code,
+            "changed": False,
+            "note": (
+                "A possible parameter correction was identified, "
+                "but the resulting code did not pass Python syntax "
+                "validation."
+            ),
+        }
+
+    return {
+        "fixed_code": code,
+        "changed": False,
+        "note": (
+            f"The debugger detected a non-numeric parameter "
+            f"'{parameter_value}' in gate '{gate_name}' "
+            f"on line {line_number}. A possible correction is "
+            f"to replace it with the numeric value 0.0."
+        ),
+        "suggested_fix": {
+            "gate": gate_name,
+            "line": line_number,
+            "parameter_index": parameter_index,
+            "invalid_parameter": parameter_value,
+            "suggested_parameter": 0.0,
+            "code": fixed_code,
+            "warning": (
+                "Replacing a gate parameter changes the circuit's "
+                "mathematical operation. Review the value before "
+                "applying this suggestion."
+            ),
+        },
+    }
+
+
+def _find_invalid_parameter(tree):
+    """
+    Find a clearly invalid string literal used as the parameter
+    of a parameterized Qiskit gate.
+
+    Returns:
+
+        (
+            gate_name,
+            line_number,
+            parameter_index,
+            parameter_value
+        )
+
+    or None.
+    """
+
+    for node in ast.walk(tree):
+
+        if not isinstance(node, ast.Call):
+            continue
+
+        if not isinstance(node.func, ast.Attribute):
+            continue
+
+        if not isinstance(node.func.value, ast.Name):
+            continue
+
+        object_name = node.func.value.id.lower()
+
+        if object_name not in {
+            "qc",
+            "circuit",
+            "quantum_circuit",
+        }:
+            continue
+
+        gate_name = node.func.attr.lower()
+
+        if gate_name not in PARAMETERIZED_GATES:
+            continue
+
+        for index, argument in enumerate(node.args):
+
+            if not isinstance(
+                argument,
+                ast.Constant,
+            ):
+                continue
+
+            value = argument.value
+
+            if not isinstance(value, str):
+                continue
+
+            stripped = value.strip()
+
+            if not stripped:
+                continue
+
+            # A numeric string is not considered an invalid
+            # parameter because it can be converted safely.
+            try:
+                float(stripped)
+                continue
+            except ValueError:
+                pass
+
+            return (
+                gate_name,
+                getattr(
+                    node,
+                    "lineno",
+                    None,
+                ),
+                index,
+                value,
+            )
+
+    return None
+
+
+def _replace_parameter_on_line(
+    line,
+    invalid_value,
+    replacement,
+    parameter_index,
+):
+    """
+    Replace the specific quoted parameter on the affected line.
+
+    Only the matching quoted literal is replaced.
+    """
+
+    escaped_value = re.escape(
+        str(invalid_value)
+    )
+
+    patterns = [
+        re.compile(
+            r"(['\"])"
+            + escaped_value
+            + r"\1"
+        ),
+    ]
+
+    for pattern in patterns:
+
+        matches = list(
+            pattern.finditer(line)
+        )
+
+        if not matches:
+            continue
+
+        if parameter_index < len(matches):
+            match = matches[parameter_index]
+
+            return (
+                line[:match.start()]
+                + replacement
+                + line[match.end():]
+            )
+
+        return None
+
+    return None
 
 
 # =============================================================
@@ -291,10 +603,6 @@ def _handle_indentation_error(code, error_message):
     except SyntaxError as exc:
         error_line = exc.lineno
 
-    # ---------------------------------------------------------
-    # Handle reported line
-    # ---------------------------------------------------------
-
     if error_line is not None:
 
         target_index = error_line - 1
@@ -371,10 +679,6 @@ def _handle_indentation_error(code, error_message):
                             ),
                         },
                     }
-
-    # ---------------------------------------------------------
-    # Fallback search
-    # ---------------------------------------------------------
 
     for index in range(len(lines) - 1):
 
@@ -464,14 +768,6 @@ def _handle_indentation_error(code, error_message):
 def _handle_syntax_error(code, error_message):
     """
     Safely fix one missing closing delimiter.
-
-    Example:
-
-        qc.h(0
-
-    becomes:
-
-        qc.h(0)
     """
 
     if not code.strip():
@@ -739,12 +1035,6 @@ def _find_comment_position(line):
 def _handle_qubit_error(code, message):
     """
     Handle qubit-index errors conservatively.
-
-    The debugger identifies the invalid qubit and generates
-    a possible correction suggestion.
-
-    The correction is NOT automatically applied because
-    changing the target qubit can change the circuit's meaning.
     """
 
     details = _extract_qubit_error(message)
@@ -817,10 +1107,6 @@ def _handle_qubit_error(code, message):
     if available_qubits:
         suggested_qubit = available_qubits[0]
 
-    # ---------------------------------------------------------
-    # A possible correction exists.
-    # ---------------------------------------------------------
-
     if suggested_qubit is not None:
 
         suggested_code = _build_qubit_suggestion(
@@ -855,10 +1141,6 @@ def _handle_qubit_error(code, message):
             },
         }
 
-    # ---------------------------------------------------------
-    # No replacement candidate.
-    # ---------------------------------------------------------
-
     return {
         "fixed_code": code,
         "changed": False,
@@ -874,14 +1156,6 @@ def _handle_qubit_error(code, message):
 def _extract_qubit_error(message):
     """
     Extract invalid qubit index and circuit size.
-
-    Supports messages such as:
-
-        Qubit index 3 is out of range for a circuit with 2 qubits.
-
-    and:
-
-        Index 3 out of range for size 2
     """
 
     patterns = [
@@ -925,14 +1199,6 @@ def _find_offending_gate(
 ):
     """
     Locate the gate containing the invalid integer qubit index.
-
-    Returns:
-
-        (
-            gate_name,
-            line_number,
-            integer_qubit_arguments
-        )
     """
 
     for node in ast.walk(tree):
@@ -994,8 +1260,6 @@ def _build_qubit_suggestion(
 ):
     """
     Build a suggested version of the affected source line.
-
-    This function does NOT apply the suggestion automatically.
     """
 
     if not line_number:
