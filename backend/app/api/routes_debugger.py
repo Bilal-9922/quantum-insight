@@ -29,10 +29,16 @@ def debug(req: DebugRequest, user=Depends(current_user)):
 
     error_message = detected_error or req.error
 
-    error_type = runner_result.get("error_type")
+    eerror_type = runner_result.get("error_type")
 
     if not error_type:
-        error_type = classify(error_message)
+        if (
+            not error_message
+            and runner_result.get("success") is True
+        ):
+            error_type = "NO_ERROR"
+        else:
+            error_type = classify(error_message)
 
     # Generate diagnosis using the detected error
     diagnosis = diagnose(
