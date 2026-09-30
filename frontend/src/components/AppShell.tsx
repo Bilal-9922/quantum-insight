@@ -138,18 +138,21 @@ export default function AppShell({
         <main className="mx-auto min-h-screen max-w-[1500px] px-4 pb-14 pt-7 sm:px-6 lg:px-8">
           {children}
 
-         {/* Footer */}
-        <footer className="mt-16 border-t border-white/5 pt-6">
-          <div className="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
-            <p className="text-xs text-slate-500">
-              © 2026 QuantumInsight. All rights reserved.
-            </p>
-        
-            <p className="text-xs text-slate-600">
-              ALL Rights For Designed OF QuantumInsight Are Reserved by <span className="text-slate-400">MOHAMMAD BILAL IRFAN SHAIKH </span>
-            </p>
-          </div>
-        </footer>
+          {/* Footer */}
+          <footer className="mt-16 border-t border-white/5 pt-6">
+            <div className="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
+              <p className="text-xs text-slate-500">
+                © 2026 QuantumInsight. All rights reserved.
+              </p>
+
+              <p className="text-xs text-slate-600">
+                Designed & Developed by{" "}
+                <span className="text-slate-400">
+                  Mohammad Bilal Irfan Shaikh
+                </span>
+              </p>
+            </div>
+          </footer>
         </main>
       </div>
 
