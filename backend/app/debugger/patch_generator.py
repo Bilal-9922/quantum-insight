@@ -12,29 +12,16 @@ def generate_patch(code, error=None):
     text = message.lower()
 
     # ---------------------------------------------------------
-    # Simple missing parenthesis
+    # Syntax error auto-fix
     # ---------------------------------------------------------
 
-    if (
-        "was never closed" in text
-        and "'('" in text
-    ):
-        fixed_code = original_code.rstrip() + ")"
+    syntax_patch = _handle_syntax_error(
+        original_code,
+        message,
+    )
 
-        try:
-            ast.parse(fixed_code)
-
-            return {
-                "fixed_code": fixed_code,
-                "changed": True,
-                "note": (
-                    "The debugger detected an unclosed parenthesis "
-                    "and automatically added the missing ')'."
-                ),
-            }
-
-        except SyntaxError:
-            pass
+    if syntax_patch is not None:
+        return syntax_patch
 
     # ---------------------------------------------------------
     # Qubit index errors
@@ -67,6 +54,7 @@ def generate_patch(code, error=None):
         ),
     }
 
+
 def _handle_syntax_error(code, error_message):
     """
     Safely fix a simple missing closing parenthesis.
@@ -74,66 +62,98 @@ def _handle_syntax_error(code, error_message):
     Example:
 
         qc.h(0
+        qc.cx(0, 1)
 
     becomes:
 
         qc.h(0)
+        qc.cx(0, 1)
     """
 
     if not code.strip():
         return None
 
-    # First confirm that the submitted code is actually invalid.
+    # ---------------------------------------------------------
+    # Parse original code to obtain the exact syntax-error line.
+    # ---------------------------------------------------------
+
     try:
         ast.parse(code)
         return None
+
     except SyntaxError as exc:
+        error_line = exc.lineno
         parser_message = str(exc.msg or "").lower()
 
-    # Python normally reports this exact condition as:
-    #
-    #     '(' was never closed
-    #
-    # Also accept common EOF wording.
     combined_message = (
-        parser_message + " " + error_message.lower()
+        parser_message
+        + " "
+        + error_message.lower()
     )
 
-    is_unclosed_parenthesis = (
-        "was never closed" in combined_message
-        or "eof while parsing" in combined_message
-        or "unexpected eof" in combined_message
-    )
-
-    if not is_unclosed_parenthesis:
+    # Only handle an unclosed parenthesis.
+    if (
+        "was never closed" not in combined_message
+        and "eof while parsing" not in combined_message
+        and "unexpected eof" not in combined_message
+    ):
         return None
 
-    # Count parentheses while ignoring the most common
-    # quoted strings and comments.
-    balance = _parenthesis_balance(code)
+    if not error_line:
+        return None
 
-    # We only fix exactly one missing ")".
+    lines = code.splitlines()
+
+    if error_line < 1 or error_line > len(lines):
+        return None
+
+    # ---------------------------------------------------------
+    # The missing parenthesis belongs on the line reported
+    # by Python.
+    # ---------------------------------------------------------
+
+    target_index = error_line - 1
+    target_line = lines[target_index]
+
+    # Do not modify a comment.
+    stripped = target_line.lstrip()
+
+    if stripped.startswith("#"):
+        return None
+
+    # ---------------------------------------------------------
+    # Confirm that this line contains an unmatched opening
+    # parenthesis.
+    # ---------------------------------------------------------
+
+    before_line = "\n".join(
+        lines[:target_index + 1]
+    )
+
+    balance = _parenthesis_balance(before_line)
+
     if balance != 1:
         return None
 
-    # Do not modify a line where the missing parenthesis would
-    # be placed inside a comment.
-    lines = code.splitlines()
+    # ---------------------------------------------------------
+    # Add the missing ')' at the end of the offending line.
+    # ---------------------------------------------------------
 
-    if not lines:
-        return None
+    lines[target_index] = target_line + ")"
 
-    last_code_line = lines[-1]
+    fixed_code = "\n".join(lines)
 
-    if "#" in last_code_line:
-        return None
+    # Preserve a final newline if the original had one.
+    if code.endswith("\n"):
+        fixed_code += "\n"
 
-    # Add the missing closing parenthesis.
-    fixed_code = code.rstrip() + ")"
-
+    # ---------------------------------------------------------
     # Verify the generated code.
+    # ---------------------------------------------------------
+
     try:
         ast.parse(fixed_code)
+
     except SyntaxError:
         return None
 
@@ -141,8 +161,9 @@ def _handle_syntax_error(code, error_message):
         "fixed_code": fixed_code,
         "changed": True,
         "note": (
-            "The debugger detected an unclosed parenthesis "
-            "and automatically added the missing ')'."
+            f"The debugger detected an unclosed parenthesis "
+            f"on line {error_line} and automatically added "
+            "the missing ')'."
         ),
     }
 
@@ -153,9 +174,10 @@ def _parenthesis_balance(code):
     and comments.
 
     Returns:
-        1  -> exactly one '(' is unclosed
+
+        1  -> one '(' is unclosed
         0  -> balanced
-        -1 -> more closing ')' than opening '('
+        -1 -> too many ')'
     """
 
     balance = 0
@@ -163,6 +185,7 @@ def _parenthesis_balance(code):
     length = len(code)
 
     while i < length:
+
         char = code[i]
 
         # -----------------------------------------------------
@@ -170,7 +193,11 @@ def _parenthesis_balance(code):
         # -----------------------------------------------------
 
         if char == "#":
-            newline = code.find("\n", i)
+
+            newline = code.find(
+                "\n",
+                i,
+            )
 
             if newline == -1:
                 break
@@ -179,13 +206,15 @@ def _parenthesis_balance(code):
             continue
 
         # -----------------------------------------------------
-        # Single-quoted string
+        # Single quoted string
         # -----------------------------------------------------
 
         if char == "'":
+
             i += 1
 
             while i < length:
+
                 if code[i] == "\\":
                     i += 2
                     continue
@@ -199,13 +228,15 @@ def _parenthesis_balance(code):
             continue
 
         # -----------------------------------------------------
-        # Double-quoted string
+        # Double quoted string
         # -----------------------------------------------------
 
         if char == '"':
+
             i += 1
 
             while i < length:
+
                 if code[i] == "\\":
                     i += 2
                     continue
@@ -226,6 +257,7 @@ def _parenthesis_balance(code):
             balance += 1
 
         elif char == ")":
+
             balance -= 1
 
             if balance < 0:
@@ -239,6 +271,9 @@ def _parenthesis_balance(code):
 def _handle_qubit_error(code, message):
     """
     Handle qubit-index errors conservatively.
+
+    We do NOT replace an invalid qubit with another arbitrary
+    qubit because doing so can change the circuit's meaning.
     """
 
     details = _extract_qubit_error(message)
@@ -258,6 +293,7 @@ def _handle_qubit_error(code, message):
 
     try:
         tree = ast.parse(code)
+
     except SyntaxError:
         return {
             "fixed_code": code,
@@ -319,40 +355,65 @@ def _extract_qubit_error(message):
     invalid_index = int(match.group(1))
     qubit_count = int(match.group(2))
 
-    return invalid_index, qubit_count
+    return (
+        invalid_index,
+        qubit_count,
+    )
 
 
-def _find_offending_gate(tree, invalid_index, qubit_count):
+def _find_offending_gate(
+    tree,
+    invalid_index,
+    qubit_count,
+):
     """
     Locate the gate containing the invalid integer qubit index.
     """
 
     for node in ast.walk(tree):
 
-        if not isinstance(node, ast.Call):
+        if not isinstance(
+            node,
+            ast.Call,
+        ):
             continue
 
-        if not isinstance(node.func, ast.Attribute):
+        if not isinstance(
+            node.func,
+            ast.Attribute,
+        ):
             continue
 
         gate_name = node.func.attr
 
         for arg in node.args:
 
-            if isinstance(arg, ast.Constant):
+            if not isinstance(
+                arg,
+                ast.Constant,
+            ):
+                continue
 
-                if isinstance(arg.value, int):
+            if not isinstance(
+                arg.value,
+                int,
+            ):
+                continue
 
-                    if (
-                        arg.value == invalid_index
-                        and (
-                            invalid_index < 0
-                            or invalid_index >= qubit_count
-                        )
-                    ):
-                        return (
-                            gate_name,
-                            getattr(node, "lineno", None),
-                        )
+            if (
+                arg.value == invalid_index
+                and (
+                    invalid_index < 0
+                    or invalid_index >= qubit_count
+                )
+            ):
+                return (
+                    gate_name,
+                    getattr(
+                        node,
+                        "lineno",
+                        None,
+                    ),
+                )
 
     return None
