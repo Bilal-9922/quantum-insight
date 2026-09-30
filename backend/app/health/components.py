@@ -54,22 +54,19 @@ def health_components(m):
     #
     # For a circuit with gates, higher gate density means more
     # of the allocated qubits are likely being utilized.
-    if gate_count == 0:
-        qubit_util = 0.0
-    else:
-        estimated_active = min(
-            qubits,
-            max(
-                1,
-                round(
-                    (one_q + (two_q * 2))
-                    / max(1, gate_count)
-                    * qubits
-                )
-            )
-        )
-
-        qubit_util = (estimated_active / qubits) * 100.0
+    # Use the exact active-qubit calculation from metrics.py.
+    qubit_utilization = float(
+        m.get("qubit_utilization", 0.0)
+    )
+    
+    qubit_util = (
+        qubit_utilization * 100.0
+    )
+    
+    qubit_util = max(
+        0.0,
+        min(100.0, qubit_util)
+    )
 
     qubit_util = max(0.0, min(100.0, qubit_util))
 
