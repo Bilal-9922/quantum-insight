@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
 
+type IconProps = {
+  name: string;
+  size?: number;
+  className?: string;
+};
+
 export function Icon({
   name,
   size = 18,
   className,
-}: {
-  name: string;
-  size?: number;
-  className?: string;
-}) {
+}: IconProps) {
   const common = {
     width: size,
     height: size,
@@ -18,6 +20,9 @@ export function Icon({
     strokeWidth: 1.8,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    xmlns: "http://www.w3.org/2000/svg",
+    "aria-hidden": true,
+    focusable: false,
   };
 
   const paths: Record<string, ReactNode> = {
@@ -46,7 +51,9 @@ export function Icon({
       </>
     ),
 
-    zap: <path d="m13 2-9 12h7l-1 8 9-12h-7z" />,
+    zap: (
+      <path d="m13 2-9 12h7l-1 8 9-12h-7z" />
+    ),
 
     history: (
       <>
@@ -85,13 +92,15 @@ export function Icon({
     spark: (
       <>
         <path d="m12 3-1.4 5.1L6 10l4.6 1.9L12 17l1.4-5.1L18 10l-4.6-1.9z" />
-        <path d="m19 16-.7 2.3L16 19l2.3.7L19 22l.7-2.3L22 19l-2.3-.7z" />
+        <path d="m19 16-.7 2.3L16 19l2.3.7L19 19l-2.3-.7z" />
       </>
     ),
 
     menu: (
       <>
-        <path d="M4 7h16M4 12h16M4 17h16" />
+        <path d="M4 7h16" />
+        <path d="M4 12h16" />
+        <path d="M4 17h16" />
       </>
     ),
 
@@ -102,7 +111,9 @@ export function Icon({
       </>
     ),
 
-    check: <path d="m5 12 4 4L19 6" />,
+    check: (
+      <path d="m5 12 4 4L19 6" />
+    ),
 
     lock: (
       <>
@@ -128,16 +139,22 @@ export function Icon({
     trash: (
       <>
         <path d="M4 7h16" />
-        <path d="M10 11v6M14 11v6" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
         <path d="M6 7l1 14h10l1-14" />
         <path d="M9 7V4h6v3" />
       </>
     ),
   };
 
+  const iconContent = paths[name] ?? paths.spark;
+
   return (
-    <svg {...common} className={className}>
-      {paths[name] || paths.spark}
+    <svg
+      {...common}
+      className={className}
+    >
+      {iconContent}
     </svg>
   );
 }
