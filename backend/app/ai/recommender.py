@@ -13,7 +13,12 @@ def recommend(analysis):
     depth = int(metrics.get("depth", 0))
     two_qubit_ratio = float(metrics.get("two_qubit_ratio", 0))
 
-    two_qubit_gates = round(gates * two_qubit_ratio)
+    two_qubit_gates = int(
+        metrics.get(
+            "two_qubit_gates",
+            round(gates * two_qubit_ratio)
+        )
+    )
 
     # Health components
     depth_efficiency = float(
@@ -43,41 +48,44 @@ def recommend(analysis):
     recommendations = []
 
     # ---------------------------------------------------------
-    # 1. Two-qubit operations
+    # Two-qubit operations
     # ---------------------------------------------------------
 
-  if two_qubit_gates <= 1 and gates <= 5:
-    recommendations.append(
-        f"The circuit contains {two_qubit_gates} entangling "
-        "operation in a very small workload. This is not "
-        "necessarily an issue; preserve it unless backend "
-        "constraints or transpilation introduce additional "
-        "overhead."
-    )
-elif two_qubit_ratio >= 0.75:
-    recommendations.append(
-        f"Two-qubit operations are very high "
-        f"({two_qubit_ratio * 100:.1f}% of gates). "
-        "Review CX, CZ, and SWAP sequences for possible "
-        "cancellation, fusion, or restructuring."
-    )
-elif two_qubit_ratio >= 0.50:
-    recommendations.append(
-        f"Two-qubit operations make up "
-        f"{two_qubit_ratio * 100:.1f}% of gates. "
-        "For larger circuits, review entangling sequences "
-        "for unnecessary operations and possible cancellation."
-    )
-elif two_qubit_ratio >= 0.25:
-    recommendations.append(
-        f"The circuit contains a moderate two-qubit gate ratio "
-        f"({two_qubit_ratio * 100:.1f}%). "
-        "Check whether neighboring entangling operations can "
-        "be simplified or cancelled."
-    )
+    if two_qubit_gates <= 1 and gates <= 5:
+        recommendations.append(
+            f"The circuit contains {two_qubit_gates} "
+            "entangling operation in a very small workload. "
+            "This is not necessarily an issue; preserve it "
+            "unless backend constraints or transpilation "
+            "introduce additional overhead."
+        )
+
+    elif two_qubit_ratio >= 0.75:
+        recommendations.append(
+            f"Two-qubit operations are very high "
+            f"({two_qubit_ratio * 100:.1f}% of gates). "
+            "Review CX, CZ, and SWAP sequences for possible "
+            "cancellation, fusion, or restructuring."
+        )
+
+    elif two_qubit_ratio >= 0.50:
+        recommendations.append(
+            f"Two-qubit operations make up "
+            f"{two_qubit_ratio * 100:.1f}% of gates. "
+            "For larger circuits, review entangling sequences "
+            "for unnecessary operations and possible cancellation."
+        )
+
+    elif two_qubit_ratio >= 0.25:
+        recommendations.append(
+            f"The circuit contains a moderate two-qubit gate ratio "
+            f"({two_qubit_ratio * 100:.1f}%). "
+            "Check whether neighboring entangling operations "
+            "can be simplified or cancelled."
+        )
 
     # ---------------------------------------------------------
-    # 2. Circuit depth
+    # Circuit depth
     # ---------------------------------------------------------
 
     if depth >= 50:
@@ -102,7 +110,7 @@ elif two_qubit_ratio >= 0.25:
         )
 
     # ---------------------------------------------------------
-    # 3. Gate efficiency
+    # Gate efficiency
     # ---------------------------------------------------------
 
     if gate_efficiency < 40:
@@ -120,7 +128,7 @@ elif two_qubit_ratio >= 0.25:
         )
 
     # ---------------------------------------------------------
-    # 4. Qubit utilization
+    # Qubit utilization
     # ---------------------------------------------------------
 
     if qubit_utilization < 60:
@@ -131,44 +139,47 @@ elif two_qubit_ratio >= 0.25:
         )
 
     # ---------------------------------------------------------
-    # 5. Two-qubit efficiency
+    # Two-qubit efficiency
     # ---------------------------------------------------------
 
-    if two_qubit_efficiency < 50:
+    if two_qubit_efficiency < 50 and two_qubit_gates > 1:
         recommendations.append(
-            f"Two-qubit gate efficiency is {two_qubit_efficiency:.1f}/100. "
+            f"Two-qubit gate efficiency is "
+            f"{two_qubit_efficiency:.1f}/100. "
             "Review entangling-gate sequences for unnecessary "
             "operations and possible cancellation."
         )
 
     # ---------------------------------------------------------
-    # 6. Noise exposure
+    # Noise exposure
     # ---------------------------------------------------------
 
     if noise_exposure < 40:
         recommendations.append(
-            f"Noise exposure score is low at {noise_exposure:.1f}/100. "
-            "Reducing circuit depth and two-qubit operations should "
-            "be prioritized for execution on noisy hardware."
+            f"Noise exposure score is low at "
+            f"{noise_exposure:.1f}/100. "
+            "Reducing circuit depth and two-qubit operations "
+            "should be prioritized for execution on noisy hardware."
         )
 
     elif noise_exposure < 60:
         recommendations.append(
-            f"Noise exposure score is moderate at {noise_exposure:.1f}/100. "
-            "Reducing depth and entangling operations could improve "
-            "hardware robustness."
+            f"Noise exposure score is moderate at "
+            f"{noise_exposure:.1f}/100. "
+            "Reducing depth and entangling operations could "
+            "improve hardware robustness."
         )
 
     # ---------------------------------------------------------
-    # 7. Optimization potential
+    # Optimization potential
     # ---------------------------------------------------------
 
     if optimization_potential >= 70:
         recommendations.append(
             f"Optimization potential is high at "
             f"{optimization_potential:.1f}/100. "
-            "The circuit has several opportunities for structural "
-            "simplification."
+            "The circuit has several opportunities for "
+            "structural simplification."
         )
 
     elif optimization_potential >= 45:
@@ -180,7 +191,7 @@ elif two_qubit_ratio >= 0.25:
         )
 
     # ---------------------------------------------------------
-    # 8. Anomaly detection
+    # Anomaly detection
     # ---------------------------------------------------------
 
     if anomaly.get("anomaly"):
@@ -191,7 +202,7 @@ elif two_qubit_ratio >= 0.25:
         )
 
     # ---------------------------------------------------------
-    # 9. Healthy circuit fallback
+    # Fallback recommendation
     # ---------------------------------------------------------
 
     if not recommendations:
@@ -199,8 +210,8 @@ elif two_qubit_ratio >= 0.25:
         if qhi >= 85:
             recommendations.append(
                 "The circuit shows strong overall health with no "
-                "major heuristic issue detected. Preserve the current "
-                "structure and validate it on the intended backend."
+                "major heuristic issue detected. Preserve the "
+                "current structure and validate it on the intended backend."
             )
 
         elif qhi >= 70:
@@ -216,7 +227,7 @@ elif two_qubit_ratio >= 0.25:
                 "lowest-scoring health components for targeted optimization."
             )
 
-    # Keep the recommendation list concise.
+    # Keep the response concise.
     recommendations = recommendations[:4]
 
     return {
