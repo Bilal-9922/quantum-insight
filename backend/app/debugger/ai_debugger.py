@@ -16,19 +16,21 @@ def diagnose(code, error=None):
         "syntaxerror" in text
         or "invalid syntax" in text
         or "unexpected indent" in text
+        or "was never closed" in text
+        or "unexpected eof" in text
     ):
-        return {
-            "diagnosis": (
-                "The submitted Python/Qiskit code contains a syntax "
-                "error, so the circuit cannot be parsed correctly."
-            ),
-            "suggestions": [
-                "Check parentheses, brackets, commas, and indentation.",
-                "Inspect the line identified by the Python error message.",
-                "Make sure every gate call uses valid Python syntax.",
-            ],
-        }
-
+    return {
+        "diagnosis": (
+            "The submitted Python/Qiskit code contains a syntax "
+            "error and cannot be parsed correctly."
+        ),
+        "suggestions": [
+            "Check that all parentheses, brackets, and braces are properly closed.",
+            "Inspect the line reported by the Python syntax error.",
+            "Verify that each Qiskit gate call has the correct opening and closing parentheses.",
+        ],
+    }
+    
     # ---------------------------------------------------------
     # Qubit index errors
     # ---------------------------------------------------------
