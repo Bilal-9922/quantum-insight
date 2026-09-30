@@ -6,10 +6,28 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "../../components/Icons";
 import { useAuth } from "../../lib/auth";
+import { supabase } from "../../lib/supabase";
 
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
   const router = useRouter();
+  async function signInWithGoogle() {
+    setError("");
+    setBusy(true);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + "/login",
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+      setBusy(false);
+    }
+  }
+  
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -103,6 +121,22 @@ export default function LoginPage() {
               Use your QuantumInsight account to continue.
             </p>
 
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              disabled={busy}
+              className="btn btn-secondary w-full py-3.5"
+            >
+              <span className="text-base font-bold">G</span>
+              Continue with Google
+            </button>
+
+            <div className="my-6 flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+              <span className="h-px flex-1 bg-white/5" />
+              or continue with email
+              <span className="h-px flex-1 bg-white/5" />
+            </div>
+            
             <form
               onSubmit={submit}
               className="mt-8 space-y-5"
