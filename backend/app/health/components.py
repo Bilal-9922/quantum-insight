@@ -78,13 +78,23 @@ def health_components(m):
     if two_q == 0:
         two_q_eff = 100.0
     elif two_ratio <= 0.10:
-        two_q_eff = 95.0
+        two_q_eff = 98.0
     elif two_ratio <= 0.25:
-        two_q_eff = 80.0 - (two_ratio - 0.10) * 100.0
+        two_q_eff = 95.0 - (two_ratio - 0.10) * 60.0
     elif two_ratio <= 0.50:
-        two_q_eff = 65.0 - (two_ratio - 0.25) * 100.0
+        two_q_eff = 86.0 - (two_ratio - 0.25) * 48.0
+    elif two_ratio <= 0.75:
+        two_q_eff = 74.0 - (two_ratio - 0.50) * 56.0
     else:
-        two_q_eff = 40.0 - min(40.0, (two_ratio - 0.50) * 80.0)
+        two_q_eff = 60.0 - min(
+            60.0,
+            (two_ratio - 0.75) * 80.0
+        )
+    
+    two_q_eff = max(
+        0.0,
+        min(100.0, two_q_eff)
+    )
 
     two_q_eff = max(0.0, min(100.0, two_q_eff))
 
