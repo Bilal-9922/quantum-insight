@@ -2,6 +2,24 @@ import ast
 import re
 
 
+# -------------------------------------------------------------
+# Safe Qiskit gate aliases
+# -------------------------------------------------------------
+
+GATE_ALIASES = {
+    "hadamard": "h",
+    "paulix": "x",
+    "pauliy": "y",
+    "pauliz": "z",
+    "cnot": "cx",
+    "controllednot": "cx",
+    "controlled_x": "cx",
+    "controlled_z": "cz",
+    "phasegate": "p",
+    "identity": "id",
+}
+
+
 def generate_patch(code, error=None):
     """
     Generate safe deterministic patches for simple Qiskit errors.
@@ -36,6 +54,18 @@ def generate_patch(code, error=None):
         return syntax_patch
 
     # ---------------------------------------------------------
+    # Wrong gate-name auto-fix
+    # ---------------------------------------------------------
+
+    gate_patch = _handle_gate_name_error(
+        original_code,
+        message,
+    )
+
+    if gate_patch is not None:
+        return gate_patch
+
+    # ---------------------------------------------------------
     # Qubit index errors
     # ---------------------------------------------------------
 
@@ -63,6 +93,173 @@ def generate_patch(code, error=None):
             "No safe automatic patch was generated. "
             "The debugger only rewrites code when the "
             "correction can be determined reliably."
+        ),
+    }
+
+
+def _handle_gate_name_error(code, error_message):
+    """
+    Safely repair an unambiguous Qiskit gate-name mistake.
+
+    Example:
+
+        qc.hadamard(0)
+
+    becomes:
+
+        qc.h(0)
+
+    Only aliases explicitly defined in GATE_ALIASES are changed.
+    """
+
+    if not code.strip():
+        return None
+
+    message = str(error_message or "").lower()
+
+    gate_error = (
+        "unknown or unsupported gate" in message
+        or "unknown gate" in message
+        or "invalid gate" in message
+        or "unsupported gate" in message
+        or "gate not found" in message
+    )
+
+    if not gate_error:
+        return None
+
+    try:
+        tree = ast.parse(code)
+
+    except SyntaxError:
+        return None
+
+    replacements = []
+
+    for node in ast.walk(tree):
+
+        if not isinstance(node, ast.Call):
+            continue
+
+        if not isinstance(node.func, ast.Attribute):
+            continue
+
+        # Only modify calls such as:
+        #
+        # qc.hadamard(...)
+        #
+        # circuit.cnot(...)
+        #
+        if not isinstance(node.func.value, ast.Name):
+            continue
+
+        object_name = node.func.value.id.lower()
+
+        if object_name not in {
+            "qc",
+            "circuit",
+            "quantum_circuit",
+        }:
+            continue
+
+        current_name = node.func.attr.lower()
+
+        replacement = GATE_ALIASES.get(
+            current_name
+        )
+
+        if replacement is None:
+            continue
+
+        replacements.append(
+            (
+                node.func.lineno,
+                node.func.col_offset,
+                node.func.end_col_offset,
+                current_name,
+                replacement,
+            )
+        )
+
+    if not replacements:
+        return {
+            "fixed_code": code,
+            "changed": False,
+            "note": (
+                "An unsupported gate was detected, but no "
+                "safe and unambiguous gate replacement was found."
+            ),
+        }
+
+    # ---------------------------------------------------------
+    # Apply replacements from the source text.
+    #
+    # Work backwards so earlier positions are not affected
+    # by changes made later in the file.
+    # ---------------------------------------------------------
+
+    lines = code.splitlines()
+
+    for (
+        line_number,
+        _,
+        _,
+        current_name,
+        replacement,
+    ) in sorted(
+        replacements,
+        reverse=True,
+    ):
+
+        index = line_number - 1
+
+        if index < 0 or index >= len(lines):
+            return None
+
+        line = lines[index]
+
+        pattern = re.compile(
+            r"(\.\s*)"
+            + re.escape(current_name)
+            + r"(\s*\()",
+            re.IGNORECASE,
+        )
+
+        new_line, count = pattern.subn(
+            r"\1" + replacement + r"\2",
+            line,
+            count=1,
+        )
+
+        if count != 1:
+            return None
+
+        lines[index] = new_line
+
+    fixed_code = "\n".join(lines)
+
+    if code.endswith("\n"):
+        fixed_code += "\n"
+
+    # ---------------------------------------------------------
+    # Verify that the patched code is syntactically valid.
+    # ---------------------------------------------------------
+
+    try:
+        ast.parse(fixed_code)
+
+    except SyntaxError:
+        return None
+
+    first_change = replacements[0]
+
+    return {
+        "fixed_code": fixed_code,
+        "changed": True,
+        "note": (
+            f"The debugger detected the unsupported gate "
+            f"'{first_change[3]}' and replaced it with the "
+            f"supported Qiskit gate '{first_change[4]}'."
         ),
     }
 
@@ -104,7 +301,7 @@ def _handle_indentation_error(code, error_message):
         return None
 
     # ---------------------------------------------------------
-    # First try to identify the exact line reported by Python.
+    # Identify the exact line reported by Python.
     # ---------------------------------------------------------
 
     error_line = None
@@ -116,7 +313,7 @@ def _handle_indentation_error(code, error_message):
         error_line = exc.lineno
 
     # ---------------------------------------------------------
-    # Handle a reported indentation line first.
+    # Handle the reported line first.
     # ---------------------------------------------------------
 
     if error_line is not None:
@@ -127,6 +324,7 @@ def _handle_indentation_error(code, error_message):
             0 <= target_index < len(lines)
             and lines[target_index].strip()
         ):
+
             if target_index > 0:
 
                 previous_line = lines[target_index - 1]
@@ -150,9 +348,15 @@ def _handle_indentation_error(code, error_message):
                     and target_indent <= previous_indent
                     and not target_stripped.startswith("#")
                     and not target_stripped.startswith(
-                        ("else:", "elif ", "except", "finally:")
+                        (
+                            "else:",
+                            "elif ",
+                            "except",
+                            "finally:",
+                        )
                     )
                 ):
+
                     lines[target_index] = (
                         " " * (previous_indent + 4)
                         + target_stripped
@@ -181,10 +385,7 @@ def _handle_indentation_error(code, error_message):
                     }
 
     # ---------------------------------------------------------
-    # Fallback:
-    #
-    # Search for a block statement followed by a line that
-    # should clearly be inside that block.
+    # Fallback search for a simple block statement.
     # ---------------------------------------------------------
 
     for index in range(len(lines) - 1):
@@ -221,7 +422,12 @@ def _handle_indentation_error(code, error_message):
             continue
 
         if following_stripped.startswith(
-            ("else:", "elif ", "except", "finally:")
+            (
+                "else:",
+                "elif ",
+                "except",
+                "finally:",
+            )
         ):
             continue
 
@@ -313,7 +519,6 @@ def _handle_syntax_error(code, error_message):
     if delimiter_stack is None:
         return None
 
-    # Only make a correction when exactly one delimiter is open.
     if len(delimiter_stack) != 1:
         return None
 
@@ -329,7 +534,7 @@ def _handle_syntax_error(code, error_message):
         return None
 
     # ---------------------------------------------------------
-    # Insert the missing delimiter on the reported line.
+    # Insert the missing delimiter.
     # ---------------------------------------------------------
 
     target_index = error_line - 1
@@ -337,17 +542,23 @@ def _handle_syntax_error(code, error_message):
 
     stripped = target_line.lstrip()
 
-    # Never modify a comment line.
     if stripped.startswith("#"):
         return None
 
-    # Avoid inserting into a trailing comment.
-    comment_position = _find_comment_position(target_line)
+    comment_position = _find_comment_position(
+        target_line
+    )
 
     if comment_position is not None:
 
-        code_part = target_line[:comment_position].rstrip()
-        comment_part = target_line[comment_position:]
+        code_part = (
+            target_line[:comment_position]
+            .rstrip()
+        )
+
+        comment_part = target_line[
+            comment_position:
+        ]
 
         if not code_part:
             return None
@@ -360,7 +571,10 @@ def _handle_syntax_error(code, error_message):
         )
 
     else:
-        lines[target_index] = target_line + closing
+        lines[target_index] = (
+            target_line
+            + closing
+        )
 
     fixed_code = "\n".join(lines)
 
@@ -525,7 +739,11 @@ def _find_comment_position(line):
             in_double = not in_double
             continue
 
-        if char == "#" and not in_single and not in_double:
+        if (
+            char == "#"
+            and not in_single
+            and not in_double
+        ):
             return index
 
     return None
@@ -680,3 +898,4 @@ def _find_offending_gate(
                 )
 
     return None
+
