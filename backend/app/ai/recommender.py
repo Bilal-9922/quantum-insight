@@ -20,6 +20,13 @@ def recommend(analysis):
         )
     )
 
+    cancellation_opportunities = int(
+        metrics.get(
+            "cancellation_opportunities",
+            0
+        )
+    )
+
     # Health components
     depth_efficiency = float(
         components.get("depth_efficiency", 100)
