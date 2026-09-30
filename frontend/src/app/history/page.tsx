@@ -38,6 +38,12 @@ type HistoryResponse = {
   history: HistoryItem[];
 };
 
+type DeleteHistoryResponse = {
+  success: boolean;
+  message: string;
+  deleted_count: number;
+};
+
 const API =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://127.0.0.1:8000";
@@ -48,7 +54,11 @@ export default function History() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const [copyStatus, setCopyStatus] = useState("");
+  const [deleteStatus, setDeleteStatus] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -99,6 +109,11 @@ export default function History() {
   async function copyHistory() {
     if (history.length === 0) {
       setCopyStatus("No history to copy.");
+
+      window.setTimeout(() => {
+        setCopyStatus("");
+      }, 2500);
+
       return;
     }
 
@@ -157,6 +172,65 @@ export default function History() {
       setCopyStatus(
         "Unable to copy history. Please check browser permissions."
       );
+
+      window.setTimeout(() => {
+        setCopyStatus("");
+      }, 3000);
+    }
+  }
+
+  async function deleteHistory() {
+    const token = localStorage.getItem("qi_token");
+
+    if (!token) {
+      setDeleteStatus("Authentication session not found.");
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setDeleteStatus("");
+
+      const response = await fetch(`${API}/api/history`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+
+      const data: DeleteHistoryResponse | { detail?: string } =
+        await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          "detail" in data && data.detail
+            ? data.detail
+            : `Failed to delete history (${response.status})`
+        );
+      }
+
+      setHistory([]);
+      setShowDeleteConfirm(false);
+      setDeleteStatus(
+        `History deleted successfully${
+          "deleted_count" in data
+            ? ` (${data.deleted_count} records)`
+            : ""
+        }.`
+      );
+
+      window.setTimeout(() => {
+        setDeleteStatus("");
+      }, 4000);
+    } catch (err) {
+      setDeleteStatus(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete analysis history."
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -188,18 +262,45 @@ export default function History() {
           </div>
 
           {history.length > 0 && (
-            <button
-              type="button"
-              onClick={copyHistory}
-              className="btn btn-secondary inline-flex items-center justify-center gap-2"
-            >
-              <Icon name="copy" size={15} />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={copyHistory}
+                className="btn btn-secondary inline-flex items-center justify-center gap-2"
+              >
+                <Icon name="copy" size={15} />
 
-              {copyStatus || "Copy History"}
-            </button>
+                {copyStatus || "Copy History"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteStatus("");
+                  setShowDeleteConfirm(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/5 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-200"
+              >
+                <Icon name="trash" size={15} />
+
+                Delete History
+              </button>
+            </div>
           )}
         </div>
       </div>
+
+      {copyStatus && copyStatus !== "History copied!" && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+          {copyStatus}
+        </div>
+      )}
+
+      {deleteStatus && (
+        <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-sm text-cyan-300">
+          {deleteStatus}
+        </div>
+      )}
 
       {error && (
         <div className="card border border-red-400/20 bg-red-400/5 p-5">
@@ -370,6 +471,51 @@ export default function History() {
               </details>
             </div>
           ))}
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
+                <Icon name="trash" size={20} />
+              </div>
+
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  Delete all history?
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  This will permanently delete all your saved
+                  analysis records. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={deleteHistory}
+                disabled={deleting}
+                className="rounded-xl bg-rose-500/90 px-4 py-2 text-sm font-bold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting
+                  ? "Deleting..."
+                  : "Delete History"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
