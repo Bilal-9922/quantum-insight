@@ -21,57 +21,90 @@ class DebugRequest(BaseModel):
 
 @router.post("/debug")
 def debug(req: DebugRequest, user=Depends(current_user)):
-    # Analyze the Python structure
+
+    # ---------------------------------------------------------
+    # AST analysis
+    # ---------------------------------------------------------
+
     ast_result = analyze_ast(req.code)
 
-    # Run static Qiskit-specific validation
+    # ---------------------------------------------------------
+    # Run the submitted code through the circuit checker
+    # ---------------------------------------------------------
+
     runner_result = run_qiskit_check(req.code)
 
-    # Prefer the error discovered from the submitted code.
-    # Fall back to the manually supplied error when necessary.
+    # ---------------------------------------------------------
+    # Prefer the error detected from the submitted code.
+    # Fall back to the manually supplied error message.
+    # ---------------------------------------------------------
+
     detected_error = runner_result.get("error")
+
     error_message = detected_error or req.error
 
-    # Get the error type detected by the Qiskit validator.
+    # ---------------------------------------------------------
+    # Determine error type
+    # ---------------------------------------------------------
+
     error_type = runner_result.get("error_type")
 
-    # If there is no detected error, determine whether this is
-    # a valid circuit with no supplied runtime error.
     if not error_type:
+
         if (
             not error_message
             and runner_result.get("success") is True
         ):
             error_type = "NO_ERROR"
+
         else:
             error_type = classify(error_message)
 
-    # Generate diagnosis using the detected error
+    # ---------------------------------------------------------
+    # AI diagnosis
+    # ---------------------------------------------------------
+
     diagnosis = diagnose(
         req.code,
-        error_message
+        error_message,
     )
 
-    # Generate patch
+    # ---------------------------------------------------------
+    # Generate automatic patch
+    # ---------------------------------------------------------
+
     patch = generate_patch(
         req.code,
-        error_message
+        error_message,
     )
 
-    # Verify the resulting code
+    # ---------------------------------------------------------
+    # Verify the patched code
+    # ---------------------------------------------------------
+
     verification = verify(
         patch["fixed_code"]
     )
 
+    # ---------------------------------------------------------
+    # Final debugger response
+    # ---------------------------------------------------------
+
     return {
         "success": True,
+
         "ast": ast_result,
+
         "runner": runner_result,
+
         "error": {
             "type": error_type,
             "message": error_message,
         },
+
         **diagnosis,
+
         **patch,
+
         **verification,
     }
