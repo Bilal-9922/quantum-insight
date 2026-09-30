@@ -23,6 +23,20 @@ def get_history(
     try:
         user_id = user["id"]
 
+        # Get the total number of analyses belonging
+        # to the currently authenticated user.
+        count_result = (
+            supabase
+            .table("analysis_history")
+            .select("id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        total_count = len(count_result.data or [])
+
+        # Load only the requested number of recent records
+        # for displaying the history page.
         result = (
             supabase
             .table("analysis_history")
@@ -35,7 +49,7 @@ def get_history(
 
         return {
             "success": True,
-            "count": len(result.data or []),
+            "count": total_count,
             "history": result.data or [],
         }
 
@@ -53,15 +67,25 @@ def delete_history(
     try:
         user_id = user["id"]
 
-        result = (
+        # Count the user's records before deleting them.
+        count_result = (
+            supabase
+            .table("analysis_history")
+            .select("id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        deleted_count = len(count_result.data or [])
+
+        # Delete only this user's analysis history.
+        (
             supabase
             .table("analysis_history")
             .delete()
             .eq("user_id", user_id)
             .execute()
         )
-
-        deleted_count = len(result.data or [])
 
         return {
             "success": True,
