@@ -60,6 +60,9 @@ export default function History() {
   const [selectedAnalyses, setSelectedAnalyses] =
     useState<number[]>([]);
 
+  const [showComparison, setShowComparison] =
+    useState(false);
+
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] =
     useState(false);
@@ -128,10 +131,21 @@ export default function History() {
 
       return [...current, id];
     });
+
+    setShowComparison(false);
   }
 
   function clearSelection() {
     setSelectedAnalyses([]);
+    setShowComparison(false);
+  }
+
+  function compareSelected() {
+    if (selectedAnalyses.length !== 2) {
+      return;
+    }
+
+    setShowComparison(true);
   }
 
   async function copyHistory() {
@@ -164,9 +178,9 @@ export default function History() {
           `Date: ${new Date(
             item.created_at
           ).toLocaleString()}`,
-          `Quantum Health Index: ${item.health_score.toFixed(
-            1
-          )}/100`,
+          `Quantum Health Index: ${Number(
+            item.health_score || 0
+          ).toFixed(1)}/100`,
           `Health Category: ${item.health_category}`,
           `Qubits: ${item.metrics?.qubits ?? "—"}`,
           `Gates: ${item.metrics?.gate_count ?? "—"}`,
@@ -312,7 +326,6 @@ export default function History() {
     );
 
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
 
     link.href = url;
@@ -373,6 +386,7 @@ export default function History() {
 
       setHistory([]);
       setSelectedAnalyses([]);
+      setShowComparison(false);
       setShowDeleteConfirm(false);
 
       setDeleteStatus(
@@ -396,6 +410,15 @@ export default function History() {
       setDeleting(false);
     }
   }
+
+  const selectedHistory = selectedAnalyses
+    .map((id) =>
+      history.find((item) => item.id === id)
+    )
+    .filter(
+      (item): item is HistoryItem =>
+        Boolean(item)
+    );
 
   if (authLoading || loading) {
     return (
@@ -458,7 +481,6 @@ export default function History() {
                 className="btn btn-secondary inline-flex items-center justify-center gap-2"
               >
                 <Icon name="copy" size={15} />
-
                 {copyStatus || "Copy History"}
               </button>
 
@@ -468,7 +490,6 @@ export default function History() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:border-cyan-400/20 hover:bg-cyan-400/10 hover:text-cyan-200"
               >
                 <Icon name="download" size={15} />
-
                 Export CSV
               </button>
 
@@ -481,7 +502,6 @@ export default function History() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/5 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/10 hover:text-rose-200"
               >
                 <Icon name="trash" size={15} />
-
                 Delete History
               </button>
             </div>
@@ -528,6 +548,7 @@ export default function History() {
               <button
                 type="button"
                 disabled={selectedAnalyses.length !== 2}
+                onClick={compareSelected}
                 className="inline-flex items-center gap-2 rounded-lg bg-violet-400/10 px-3.5 py-2 text-xs font-bold text-violet-300 transition hover:bg-violet-400/15 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Compare
@@ -631,6 +652,15 @@ export default function History() {
           </div>
         </div>
       )}
+
+      {/* Comparison panel */}
+      {showComparison &&
+        selectedHistory.length === 2 && (
+          <ComparisonPanel
+            analyses={selectedHistory}
+            onClose={() => setShowComparison(false)}
+          />
+        )}
 
       {/* History list */}
       {history.length > 0 && (
@@ -896,7 +926,7 @@ function HistoryCard({
             </div>
 
             <pre className="max-h-80 overflow-auto rounded-xl border border-white/5 bg-black/30 p-4 text-xs leading-6 text-slate-300">
-              {item.circuit}
+              {item.circuit || "No circuit available."}
             </pre>
           </div>
 
@@ -963,6 +993,408 @@ function HistoryMetric({
       <p className="mt-1 text-lg font-bold text-slate-200">
         {value}
       </p>
+    </div>
+  );
+}
+
+function ComparisonPanel({
+  analyses,
+  onClose,
+}: {
+  analyses: HistoryItem[];
+  onClose: () => void;
+}) {
+  if (analyses.length !== 2) {
+    return null;
+  }
+
+  const [first, second] = analyses;
+
+  const metrics = [
+    {
+      label: "Quantum Health Index",
+      first: `${Number(
+        first.health_score || 0
+      ).toFixed(1)}/100`,
+      second: `${Number(
+        second.health_score || 0
+      ).toFixed(1)}/100`,
+      highlight: true,
+    },
+    {
+      label: "Health Category",
+      first: first.health_category || "—",
+      second: second.health_category || "—",
+      highlight: false,
+    },
+    {
+      label: "Qubits",
+      first: first.metrics?.qubits ?? "—",
+      second: second.metrics?.qubits ?? "—",
+      highlight: false,
+    },
+    {
+      label: "Total Gates",
+      first: first.metrics?.gate_count ?? "—",
+      second: second.metrics?.gate_count ?? "—",
+      highlight: false,
+    },
+    {
+      label: "Circuit Depth",
+      first: first.metrics?.depth ?? "—",
+      second: second.metrics?.depth ?? "—",
+      highlight: false,
+    },
+    {
+      label: "1Q Gates",
+      first:
+        first.metrics?.one_qubit_gates ?? "—",
+      second:
+        second.metrics?.one_qubit_gates ?? "—",
+      highlight: false,
+    },
+    {
+      label: "2Q Gates",
+      first:
+        first.metrics?.two_qubit_gates ?? "—",
+      second:
+        second.metrics?.two_qubit_gates ?? "—",
+      highlight: false,
+    },
+    {
+      label: "2Q Gate Ratio",
+      first:
+        first.metrics?.two_qubit_ratio != null
+          ? Number(
+              first.metrics.two_qubit_ratio
+            ).toFixed(3)
+          : "—",
+      second:
+        second.metrics?.two_qubit_ratio != null
+          ? Number(
+              second.metrics.two_qubit_ratio
+            ).toFixed(3)
+          : "—",
+      highlight: false,
+    },
+    {
+      label: "Gate Density",
+      first:
+        first.metrics?.gate_density != null
+          ? Number(
+              first.metrics.gate_density
+            ).toFixed(3)
+          : "—",
+      second:
+        second.metrics?.gate_density != null
+          ? Number(
+              second.metrics.gate_density
+            ).toFixed(3)
+          : "—",
+      highlight: false,
+    },
+    {
+      label: "Measurement Ratio",
+      first:
+        first.metrics?.measurement_ratio != null
+          ? Number(
+              first.metrics.measurement_ratio
+            ).toFixed(3)
+          : "—",
+      second:
+        second.metrics?.measurement_ratio != null
+          ? Number(
+              second.metrics.measurement_ratio
+            ).toFixed(3)
+          : "—",
+      highlight: false,
+    },
+    {
+      label: "Anomaly Score",
+      first:
+        first.anomaly_score != null
+          ? Number(
+              first.anomaly_score
+            ).toFixed(3)
+          : "—",
+      second:
+        second.anomaly_score != null
+          ? Number(
+              second.anomaly_score
+            ).toFixed(3)
+          : "—",
+      highlight: false,
+    },
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-3xl border border-violet-400/15 bg-slate-950 shadow-[0_20px_80px_rgba(0,0,0,.25)]">
+      {/* Header */}
+      <div className="border-b border-white/5 bg-violet-400/[.035] p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-400/10 text-violet-300">
+                <Icon name="analyze" size={15} />
+              </span>
+
+              <p className="section-kicker">
+                Analysis comparison
+              </p>
+            </div>
+
+            <h2 className="mt-3 text-xl font-black text-white">
+              Circuit Health Comparison
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Compare the selected quantum circuit
+              analyses side by side.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white"
+          >
+            <Icon name="close" size={15} />
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Analysis identities */}
+      <div className="grid gap-px border-b border-white/5 bg-white/5 md:grid-cols-2">
+        <ComparisonIdentity
+          label="Analysis A"
+          item={first}
+        />
+
+        <ComparisonIdentity
+          label="Analysis B"
+          item={second}
+        />
+      </div>
+
+      {/* Metrics */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[680px]">
+          <div className="grid grid-cols-[1.2fr_1fr_1fr] border-b border-white/5 bg-white/[.018]">
+            <div className="px-5 py-3 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-600">
+              Metric
+            </div>
+
+            <div className="border-l border-white/5 px-5 py-3 text-[9px] font-bold uppercase tracking-[0.16em] text-violet-300">
+              Analysis A
+            </div>
+
+            <div className="border-l border-white/5 px-5 py-3 text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-300">
+              Analysis B
+            </div>
+          </div>
+
+          {metrics.map((metric) => (
+            <div
+              key={metric.label}
+              className="grid grid-cols-[1.2fr_1fr_1fr] border-b border-white/5 last:border-b-0"
+            >
+              <div className="px-5 py-4 text-sm font-medium text-slate-400">
+                {metric.label}
+              </div>
+
+              <div
+                className={`border-l border-white/5 px-5 py-4 text-sm font-bold ${
+                  metric.highlight
+                    ? "text-violet-300"
+                    : "text-slate-200"
+                }`}
+              >
+                {metric.first}
+              </div>
+
+              <div
+                className={`border-l border-white/5 px-5 py-4 text-sm font-bold ${
+                  metric.highlight
+                    ? "text-cyan-300"
+                    : "text-slate-200"
+                }`}
+              >
+                {metric.second}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Circuits */}
+      <div className="grid gap-px border-t border-white/5 bg-white/5 lg:grid-cols-2">
+        <ComparisonCircuit
+          label="Analysis A Circuit"
+          circuit={first.circuit}
+        />
+
+        <ComparisonCircuit
+          label="Analysis B Circuit"
+          circuit={second.circuit}
+        />
+      </div>
+
+      {/* Recommendations */}
+      <div className="grid gap-px border-t border-white/5 bg-white/5 lg:grid-cols-2">
+        <ComparisonRecommendations
+          label="Analysis A Recommendations"
+          recommendations={
+            first.recommendations?.recommendations ||
+            []
+          }
+        />
+
+        <ComparisonRecommendations
+          label="Analysis B Recommendations"
+          recommendations={
+            second.recommendations?.recommendations ||
+            []
+          }
+        />
+      </div>
+
+      {/* Explanations */}
+      <div className="grid gap-px border-t border-white/5 bg-white/5 lg:grid-cols-2">
+        <ComparisonExplanation
+          label="Analysis A Explanation"
+          explanation={first.explanation}
+        />
+
+        <ComparisonExplanation
+          label="Analysis B Explanation"
+          explanation={second.explanation}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ComparisonIdentity({
+  label,
+  item,
+}: {
+  label: string;
+  item: HistoryItem;
+}) {
+  return (
+    <div className="bg-slate-950/80 p-5 sm:p-6">
+      <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-600">
+        {label}
+      </p>
+
+      <div className="mt-3 flex items-end justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-white">
+            {item.health_category || "Unknown"}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-600">
+            {new Date(
+              item.created_at
+            ).toLocaleString()}
+          </p>
+        </div>
+
+        <div className="text-right">
+          <p className="text-2xl font-black text-cyan-300">
+            {Number(
+              item.health_score || 0
+            ).toFixed(1)}
+          </p>
+
+          <p className="text-[9px] uppercase tracking-widest text-slate-600">
+            QHI
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComparisonCircuit({
+  label,
+  circuit,
+}: {
+  label: string;
+  circuit: string;
+}) {
+  return (
+    <div className="bg-slate-950/80 p-5 sm:p-6">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
+        {label}
+      </p>
+
+      <pre className="max-h-72 overflow-auto rounded-xl border border-white/5 bg-black/30 p-4 text-xs leading-6 text-slate-300">
+        {circuit || "No circuit available."}
+      </pre>
+    </div>
+  );
+}
+
+function ComparisonRecommendations({
+  label,
+  recommendations,
+}: {
+  label: string;
+  recommendations: string[];
+}) {
+  return (
+    <div className="bg-slate-950/80 p-5 sm:p-6">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
+        {label}
+      </p>
+
+      {recommendations.length > 0 ? (
+        <div className="space-y-2">
+          {recommendations.map(
+            (recommendation, index) => (
+              <div
+                key={index}
+                className="flex gap-3 rounded-xl border border-white/5 bg-white/[.018] px-4 py-3"
+              >
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-300" />
+
+                <p className="text-sm leading-6 text-slate-300">
+                  {recommendation}
+                </p>
+              </div>
+            )
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600">
+          No recommendations available.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ComparisonExplanation({
+  label,
+  explanation,
+}: {
+  label: string;
+  explanation: string;
+}) {
+  return (
+    <div className="bg-slate-950/80 p-5 sm:p-6">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
+        {label}
+      </p>
+
+      <div className="rounded-xl border border-white/5 bg-white/[.018] p-4">
+        <p className="text-sm leading-6 text-slate-400">
+          {explanation ||
+            "No explanation available."}
+        </p>
+      </div>
     </div>
   );
 }
