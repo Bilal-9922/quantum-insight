@@ -10,6 +10,7 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  googleLogin: () => Promise<void>;
   logout: () => void;
 };
 
@@ -43,10 +44,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(email: string, password: string) { await authRequest("/api/auth/login", { email, password }); }
+  async function googleLogin() {
+  const { supabase } = await import("./supabase");
+
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error || !session?.access_token) {
+    throw new Error("Google authentication session not found.");
+  }
+
+  await authRequest("/api/auth/google", {
+    access_token: session.access_token,
+  });
+}
   async function register(name: string, email: string, password: string) { await authRequest("/api/auth/register", { name, email, password }); }
   function logout() { window.localStorage.removeItem("qi_token"); setToken(null); setUser(null); }
 
-  return <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>{children}</AuthContext.Provider>;
+  return (
+  <AuthContext.Provider
+    value={{
+      user,
+      token,
+      loading,
+      login,
+      register,
+      googleLogin,
+      logout,
+    }}
+  >
+    {children}
+  </AuthContext.Provider>
+);
 }
 
 export function useAuth() {
