@@ -1,14 +1,10 @@
 import ast
-import tokenize
-from io import StringIO
+import re
 
 
 def generate_patch(code, error=None):
     """
     Generate safe deterministic patches for simple Qiskit errors.
-
-    The generator only changes code when the correction can be
-    determined without changing the intended quantum operation.
     """
 
     original_code = code or ""
@@ -16,32 +12,13 @@ def generate_patch(code, error=None):
     text = message.lower()
 
     # ---------------------------------------------------------
-    # Syntax errors
+    # Syntax error auto-fix
     # ---------------------------------------------------------
 
-    syntax_patch = _handle_syntax_error(original_code)
+    syntax_patch = _handle_syntax_error(original_code, message)
 
     if syntax_patch is not None:
         return syntax_patch
-
-    is_syntax_error = (
-        "syntaxerror" in text
-        or "invalid syntax" in text
-        or "was never closed" in text
-        or "unexpected eof" in text
-        or "unexpected end of input" in text
-        or "eof while parsing" in text
-    )
-
-    if is_syntax_error:
-        return {
-            "fixed_code": original_code,
-            "changed": False,
-            "note": (
-                "A syntax error was detected, but the debugger could "
-                "not determine a safe structural correction."
-            ),
-        }
 
     # ---------------------------------------------------------
     # Qubit index errors
@@ -75,9 +52,9 @@ def generate_patch(code, error=None):
     }
 
 
-def _handle_syntax_error(code):
+def _handle_syntax_error(code, error_message):
     """
-    Detect an unmatched opening delimiter and safely close it.
+    Safely fix a simple missing closing parenthesis.
 
     Example:
 
@@ -91,91 +68,55 @@ def _handle_syntax_error(code):
     if not code.strip():
         return None
 
-    stack = []
-
-    opening = {
-        "(": ")",
-        "[": "]",
-        "{": "}",
-    }
-
-    closing = {
-        ")": "(",
-        "]": "[",
-        "}": "{",
-    }
-
+    # First confirm that the submitted code is actually invalid.
     try:
-        token_stream = tokenize.generate_tokens(
-            StringIO(code).readline
-        )
-
-        while True:
-            try:
-                token = next(token_stream)
-
-            except StopIteration:
-                break
-
-            except tokenize.TokenError:
-                # Incomplete Python commonly ends with a TokenError.
-                # The tokens collected before the error are still
-                # sufficient to detect an unmatched delimiter.
-                break
-
-            value = token.string
-
-            if value in opening:
-                stack.append(value)
-
-            elif value in closing:
-
-                if not stack:
-                    return None
-
-                expected = closing[value]
-
-                if stack[-1] != expected:
-                    return None
-
-                stack.pop()
-
-    except (IndentationError, SyntaxError):
+        ast.parse(code)
         return None
+    except SyntaxError as exc:
+        parser_message = str(exc.msg or "").lower()
 
-    # Nothing is unclosed.
-    if not stack:
-        return None
-
-    # Only automatically fix a single unmatched parenthesis.
+    # Python normally reports this exact condition as:
     #
-    # This keeps the automatic fixer conservative and prevents
-    # it from making large structural changes to user code.
-    if len(stack) != 1:
+    #     '(' was never closed
+    #
+    # Also accept common EOF wording.
+    combined_message = (
+        parser_message + " " + error_message.lower()
+    )
+
+    is_unclosed_parenthesis = (
+        "was never closed" in combined_message
+        or "eof while parsing" in combined_message
+        or "unexpected eof" in combined_message
+    )
+
+    if not is_unclosed_parenthesis:
         return None
 
-    if stack[0] != "(":
+    # Count parentheses while ignoring the most common
+    # quoted strings and comments.
+    balance = _parenthesis_balance(code)
+
+    # We only fix exactly one missing ")".
+    if balance != 1:
         return None
 
-    # Do not modify code when the final non-empty line is only
-    # a comment. Appending ")" after a comment would be unsafe.
-    non_empty_lines = [
-        line
-        for line in code.splitlines()
-        if line.strip()
-    ]
+    # Do not modify a line where the missing parenthesis would
+    # be placed inside a comment.
+    lines = code.splitlines()
 
-    if not non_empty_lines:
+    if not lines:
         return None
 
-    last_line = non_empty_lines[-1]
+    last_code_line = lines[-1]
 
-    if "#" in last_line:
+    if "#" in last_code_line:
         return None
 
+    # Add the missing closing parenthesis.
     fixed_code = code.rstrip() + ")"
 
-    # Verify the generated Python syntax.
+    # Verify the generated code.
     try:
         ast.parse(fixed_code)
     except SyntaxError:
@@ -191,12 +132,98 @@ def _handle_syntax_error(code):
     }
 
 
+def _parenthesis_balance(code):
+    """
+    Count unmatched parentheses while ignoring strings
+    and comments.
+
+    Returns:
+        1  -> exactly one '(' is unclosed
+        0  -> balanced
+        -1 -> more closing ')' than opening '('
+    """
+
+    balance = 0
+    i = 0
+    length = len(code)
+
+    while i < length:
+        char = code[i]
+
+        # -----------------------------------------------------
+        # Comment
+        # -----------------------------------------------------
+
+        if char == "#":
+            newline = code.find("\n", i)
+
+            if newline == -1:
+                break
+
+            i = newline + 1
+            continue
+
+        # -----------------------------------------------------
+        # Single-quoted string
+        # -----------------------------------------------------
+
+        if char == "'":
+            i += 1
+
+            while i < length:
+                if code[i] == "\\":
+                    i += 2
+                    continue
+
+                if code[i] == "'":
+                    i += 1
+                    break
+
+                i += 1
+
+            continue
+
+        # -----------------------------------------------------
+        # Double-quoted string
+        # -----------------------------------------------------
+
+        if char == '"':
+            i += 1
+
+            while i < length:
+                if code[i] == "\\":
+                    i += 2
+                    continue
+
+                if code[i] == '"':
+                    i += 1
+                    break
+
+                i += 1
+
+            continue
+
+        # -----------------------------------------------------
+        # Parentheses
+        # -----------------------------------------------------
+
+        if char == "(":
+            balance += 1
+
+        elif char == ")":
+            balance -= 1
+
+            if balance < 0:
+                return balance
+
+        i += 1
+
+    return balance
+
+
 def _handle_qubit_error(code, message):
     """
     Handle qubit-index errors conservatively.
-
-    We do NOT replace an invalid qubit with another arbitrary
-    qubit because doing so can change the circuit's meaning.
     """
 
     details = _extract_qubit_error(message)
@@ -216,7 +243,6 @@ def _handle_qubit_error(code, message):
 
     try:
         tree = ast.parse(code)
-
     except SyntaxError:
         return {
             "fixed_code": code,
@@ -262,11 +288,8 @@ def _handle_qubit_error(code, message):
 
 def _extract_qubit_error(message):
     """
-    Extract invalid qubit index and circuit size from the
-    debugger's validation message.
+    Extract invalid qubit index and circuit size.
     """
-
-    import re
 
     match = re.search(
         r"Qubit index\s+(-?\d+)\s+is out of range\s+"
