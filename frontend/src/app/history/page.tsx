@@ -168,7 +168,7 @@ export default function History() {
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Analysis #{item.id}
+                      Analysis
                     </span>
 
                     <span className="rounded-full bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-300">
