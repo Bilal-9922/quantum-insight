@@ -9,7 +9,7 @@ import { useAuth } from "../../lib/auth";
 import { supabase } from "../../lib/supabase";
 
 export default function LoginPage() {
-  const { login, user, loading } = useAuth();
+  const { login, googleLogin, user, loading } = useAuth();
   const router = useRouter();
   async function signInWithGoogle() {
     setError("");
@@ -36,10 +36,30 @@ export default function LoginPage() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace("/dashboard");
+  async function handleGoogleCallback() {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      return;
     }
-  }, [loading, user, router]);
+
+    try {
+      await googleLogin();
+      router.replace("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "Google sign-in failed.");
+      setBusy(false);
+    }
+  }
+
+  if (!loading) {
+    if (user) {
+      router.replace("/dashboard");
+    } else {
+      handleGoogleCallback();
+    }
+  }
+}, [loading, user, router, googleLogin]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
