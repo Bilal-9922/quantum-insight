@@ -97,6 +97,10 @@ def generate_patch(code, error=None):
     }
 
 
+# =============================================================
+# GATE NAME ERROR
+# =============================================================
+
 def _handle_gate_name_error(code, error_message):
     """
     Safely repair an unambiguous Qiskit gate-name mistake.
@@ -108,8 +112,6 @@ def _handle_gate_name_error(code, error_message):
     becomes:
 
         qc.h(0)
-
-    Only aliases explicitly defined in GATE_ALIASES are changed.
     """
 
     if not code.strip():
@@ -144,12 +146,6 @@ def _handle_gate_name_error(code, error_message):
         if not isinstance(node.func, ast.Attribute):
             continue
 
-        # Only modify calls such as:
-        #
-        # qc.hadamard(...)
-        #
-        # circuit.cnot(...)
-        #
         if not isinstance(node.func.value, ast.Name):
             continue
 
@@ -174,8 +170,6 @@ def _handle_gate_name_error(code, error_message):
         replacements.append(
             (
                 node.func.lineno,
-                node.func.col_offset,
-                node.func.end_col_offset,
                 current_name,
                 replacement,
             )
@@ -191,19 +185,10 @@ def _handle_gate_name_error(code, error_message):
             ),
         }
 
-    # ---------------------------------------------------------
-    # Apply replacements from the source text.
-    #
-    # Work backwards so earlier positions are not affected
-    # by changes made later in the file.
-    # ---------------------------------------------------------
-
     lines = code.splitlines()
 
     for (
         line_number,
-        _,
-        _,
         current_name,
         replacement,
     ) in sorted(
@@ -241,10 +226,6 @@ def _handle_gate_name_error(code, error_message):
     if code.endswith("\n"):
         fixed_code += "\n"
 
-    # ---------------------------------------------------------
-    # Verify that the patched code is syntactically valid.
-    # ---------------------------------------------------------
-
     try:
         ast.parse(fixed_code)
 
@@ -258,27 +239,19 @@ def _handle_gate_name_error(code, error_message):
         "changed": True,
         "note": (
             f"The debugger detected the unsupported gate "
-            f"'{first_change[3]}' and replaced it with the "
-            f"supported Qiskit gate '{first_change[4]}'."
+            f"'{first_change[1]}' and replaced it with the "
+            f"supported Qiskit gate '{first_change[2]}'."
         ),
     }
 
 
+# =============================================================
+# INDENTATION ERROR
+# =============================================================
+
 def _handle_indentation_error(code, error_message):
     """
     Safely fix a simple missing indentation after a block statement.
-
-    Example:
-
-        if True:
-        qc.h(0)
-
-    becomes:
-
-        if True:
-            qc.h(0)
-
-    Only simple, unambiguous cases are modified.
     """
 
     message = str(error_message or "").lower()
@@ -300,10 +273,6 @@ def _handle_indentation_error(code, error_message):
     if not lines:
         return None
 
-    # ---------------------------------------------------------
-    # Identify the exact line reported by Python.
-    # ---------------------------------------------------------
-
     error_line = None
 
     try:
@@ -313,7 +282,7 @@ def _handle_indentation_error(code, error_message):
         error_line = exc.lineno
 
     # ---------------------------------------------------------
-    # Handle the reported line first.
+    # Handle reported line
     # ---------------------------------------------------------
 
     if error_line is not None:
@@ -385,7 +354,7 @@ def _handle_indentation_error(code, error_message):
                     }
 
     # ---------------------------------------------------------
-    # Fallback search for a simple block statement.
+    # Fallback search
     # ---------------------------------------------------------
 
     for index in range(len(lines) - 1):
@@ -461,24 +430,17 @@ def _handle_indentation_error(code, error_message):
     return None
 
 
+# =============================================================
+# SYNTAX ERROR
+# =============================================================
+
 def _handle_syntax_error(code, error_message):
     """
     Safely fix one missing closing delimiter.
-
-    Supported:
-        (
-        [
-        {
-
-    The correction is inserted on the line reported by Python.
     """
 
     if not code.strip():
         return None
-
-    # ---------------------------------------------------------
-    # Get the actual Python syntax error.
-    # ---------------------------------------------------------
 
     try:
         ast.parse(code)
@@ -494,7 +456,6 @@ def _handle_syntax_error(code, error_message):
         + error_message.lower()
     )
 
-    # Only handle an unclosed delimiter.
     if (
         "was never closed" not in combined_message
         and "eof while parsing" not in combined_message
@@ -509,10 +470,6 @@ def _handle_syntax_error(code, error_message):
 
     if error_line < 1 or error_line > len(lines):
         return None
-
-    # ---------------------------------------------------------
-    # Find unmatched delimiters.
-    # ---------------------------------------------------------
 
     delimiter_stack = _find_delimiter_stack(code)
 
@@ -532,10 +489,6 @@ def _handle_syntax_error(code, error_message):
 
     if closing is None:
         return None
-
-    # ---------------------------------------------------------
-    # Insert the missing delimiter.
-    # ---------------------------------------------------------
 
     target_index = error_line - 1
     target_line = lines[target_index]
@@ -581,10 +534,6 @@ def _handle_syntax_error(code, error_message):
     if code.endswith("\n"):
         fixed_code += "\n"
 
-    # ---------------------------------------------------------
-    # Verify the generated code.
-    # ---------------------------------------------------------
-
     try:
         ast.parse(fixed_code)
 
@@ -603,6 +552,10 @@ def _handle_syntax_error(code, error_message):
     }
 
 
+# =============================================================
+# DELIMITER ANALYSIS
+# =============================================================
+
 def _find_delimiter_stack(code):
     """
     Find unmatched (, [, and { delimiters.
@@ -619,10 +572,6 @@ def _find_delimiter_stack(code):
 
         char = code[i]
 
-        # -----------------------------------------------------
-        # Comment
-        # -----------------------------------------------------
-
         if char == "#":
 
             newline = code.find(
@@ -635,10 +584,6 @@ def _find_delimiter_stack(code):
 
             i = newline + 1
             continue
-
-        # -----------------------------------------------------
-        # Single quoted string
-        # -----------------------------------------------------
 
         if char == "'":
 
@@ -658,10 +603,6 @@ def _find_delimiter_stack(code):
 
             continue
 
-        # -----------------------------------------------------
-        # Double quoted string
-        # -----------------------------------------------------
-
         if char == '"':
 
             i += 1
@@ -680,16 +621,8 @@ def _find_delimiter_stack(code):
 
             continue
 
-        # -----------------------------------------------------
-        # Opening delimiters
-        # -----------------------------------------------------
-
         if char in "([{":
             stack.append(char)
-
-        # -----------------------------------------------------
-        # Closing delimiters
-        # -----------------------------------------------------
 
         elif char in ")]}":
 
@@ -711,6 +644,10 @@ def _find_delimiter_stack(code):
 
     return stack
 
+
+# =============================================================
+# COMMENT ANALYSIS
+# =============================================================
 
 def _find_comment_position(line):
     """
@@ -749,12 +686,19 @@ def _find_comment_position(line):
     return None
 
 
+# =============================================================
+# QUBIT INDEX ERROR
+# =============================================================
+
 def _handle_qubit_error(code, message):
     """
     Handle qubit-index errors conservatively.
 
-    We do NOT replace an invalid qubit with another arbitrary
-    qubit because doing so can change the circuit's meaning.
+    The debugger identifies the invalid qubit and generates
+    a possible correction suggestion.
+
+    The correction is NOT automatically applied because
+    changing the target qubit can change the circuit's meaning.
     """
 
     details = _extract_qubit_error(message)
@@ -802,7 +746,72 @@ def _handle_qubit_error(code, message):
             ),
         }
 
-    gate_name, line_number = offending_gate
+    (
+        gate_name,
+        line_number,
+        qubit_arguments,
+    ) = offending_gate
+
+    valid_qubits = list(range(qubit_count))
+
+    used_valid_qubits = [
+        q
+        for q in qubit_arguments
+        if 0 <= q < qubit_count
+    ]
+
+    available_qubits = [
+        q
+        for q in valid_qubits
+        if q not in used_valid_qubits
+    ]
+
+    suggested_qubit = None
+
+    if available_qubits:
+        suggested_qubit = available_qubits[0]
+
+    # ---------------------------------------------------------
+    # A possible correction exists.
+    # ---------------------------------------------------------
+
+    if suggested_qubit is not None:
+
+        suggested_code = _build_qubit_suggestion(
+            code,
+            line_number,
+            invalid_index,
+            suggested_qubit,
+        )
+
+        return {
+            "fixed_code": code,
+            "changed": False,
+            "note": (
+                f"Qubit index {invalid_index} is invalid for a "
+                f"{qubit_count}-qubit circuit. The affected gate "
+                f"'{gate_name}' is on line {line_number}. "
+                f"A possible correction is to replace qubit "
+                f"{invalid_index} with qubit {suggested_qubit}. "
+                "This is only a suggestion because changing the "
+                "target qubit may change the intended quantum operation."
+            ),
+            "suggested_fix": {
+                "gate": gate_name,
+                "line": line_number,
+                "invalid_qubit": invalid_index,
+                "suggested_qubit": suggested_qubit,
+                "code": suggested_code,
+                "warning": (
+                    "Review this suggestion before applying it. "
+                    "The replacement may change the circuit's semantics."
+                ),
+            },
+        }
+
+    # ---------------------------------------------------------
+    # No replacement candidate.
+    # ---------------------------------------------------------
 
     return {
         "fixed_code": code,
@@ -811,9 +820,7 @@ def _handle_qubit_error(code, message):
             f"Qubit index {invalid_index} is invalid for a "
             f"{qubit_count}-qubit circuit. The affected gate "
             f"'{gate_name}' is on line {line_number}. "
-            "No automatic replacement was made because choosing "
-            "another qubit could change the circuit's intended "
-            "quantum operation."
+            "No safe replacement qubit was identified."
         ),
     }
 
@@ -821,25 +828,48 @@ def _handle_qubit_error(code, message):
 def _extract_qubit_error(message):
     """
     Extract invalid qubit index and circuit size.
+
+    Supports messages such as:
+
+        Qubit index 3 is out of range for a circuit with 2 qubits.
+
+    and:
+
+        Index 3 out of range for size 2
     """
 
-    match = re.search(
-        r"Qubit index\s+(-?\d+)\s+is out of range\s+"
-        r"for a circuit with\s+(\d+)\s+qubit",
-        message,
-        re.IGNORECASE,
-    )
+    patterns = [
+        re.compile(
+            r"Qubit index\s+(-?\d+)\s+is out of range\s+"
+            r"for a circuit with\s+(\d+)\s+qubit",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"Index\s+(-?\d+)\s+out of range\s+for size\s+(\d+)",
+            re.IGNORECASE,
+        ),
+    ]
 
-    if not match:
-        return None
+    for pattern in patterns:
 
-    invalid_index = int(match.group(1))
-    qubit_count = int(match.group(2))
+        match = pattern.search(message)
 
-    return (
-        invalid_index,
-        qubit_count,
-    )
+        if match:
+
+            invalid_index = int(
+                match.group(1)
+            )
+
+            qubit_count = int(
+                match.group(2)
+            )
+
+            return (
+                invalid_index,
+                qubit_count,
+            )
+
+    return None
 
 
 def _find_offending_gate(
@@ -849,6 +879,14 @@ def _find_offending_gate(
 ):
     """
     Locate the gate containing the invalid integer qubit index.
+
+    Returns:
+
+        (
+            gate_name,
+            line_number,
+            integer_qubit_arguments
+        )
     """
 
     for node in ast.walk(tree):
@@ -867,6 +905,8 @@ def _find_offending_gate(
 
         gate_name = node.func.attr
 
+        integer_arguments = []
+
         for arg in node.args:
 
             if not isinstance(
@@ -881,21 +921,69 @@ def _find_offending_gate(
             ):
                 continue
 
-            if (
-                arg.value == invalid_index
-                and (
-                    invalid_index < 0
-                    or invalid_index >= qubit_count
-                )
-            ):
-                return (
-                    gate_name,
-                    getattr(
-                        node,
-                        "lineno",
-                        None,
-                    ),
-                )
+            integer_arguments.append(
+                arg.value
+            )
+
+        if invalid_index in integer_arguments:
+
+            return (
+                gate_name,
+                getattr(
+                    node,
+                    "lineno",
+                    None,
+                ),
+                integer_arguments,
+            )
 
     return None
 
+
+def _build_qubit_suggestion(
+    code,
+    line_number,
+    invalid_index,
+    suggested_qubit,
+):
+    """
+    Build a suggested version of the affected source line.
+
+    This function does NOT apply the suggestion automatically.
+    """
+
+    if not line_number:
+        return code
+
+    lines = code.splitlines()
+
+    index = line_number - 1
+
+    if index < 0 or index >= len(lines):
+        return code
+
+    line = lines[index]
+
+    pattern = re.compile(
+        r"(?<![\w])"
+        + re.escape(str(invalid_index))
+        + r"(?![\w])"
+    )
+
+    new_line, count = pattern.subn(
+        str(suggested_qubit),
+        line,
+        count=1,
+    )
+
+    if count != 1:
+        return code
+
+    lines[index] = new_line
+
+    suggested_code = "\n".join(lines)
+
+    if code.endswith("\n"):
+        suggested_code += "\n"
+
+    return suggested_code
