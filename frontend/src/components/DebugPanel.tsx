@@ -1,11 +1,21 @@
-export default function DebugPanel({ result }: { result: any }) {
+"use client";
+
+export default function DebugPanel({
+  result,
+  onApplyFix,
+}: {
+  result: any;
+  onApplyFix?: (code: string) => void;
+}) {
   if (!result) return null;
 
   const suggestedFix = result.suggested_fix;
 
   return (
     <div className="card space-y-4">
-      <h3 className="font-bold text-cyan-400">Debug result</h3>
+      <h3 className="font-bold text-cyan-400">
+        Debug result
+      </h3>
 
       <p>
         <b>Type:</b> {result.error?.type}
@@ -16,9 +26,11 @@ export default function DebugPanel({ result }: { result: any }) {
       </p>
 
       <ul className="list-disc pl-5">
-        {result.suggestions?.map((x: string, i: number) => (
-          <li key={i}>{x}</li>
-        ))}
+        {result.suggestions?.map(
+          (x: string, i: number) => (
+            <li key={i}>{x}</li>
+          )
+        )}
       </ul>
 
       <p>
@@ -48,14 +60,18 @@ export default function DebugPanel({ result }: { result: any }) {
                   : "text-slate-400"
               }
             >
-              {result.changed ? "Applied" : "Not applied"}
+              {result.changed
+                ? "Applied"
+                : "Not applied"}
             </span>
           </p>
 
           {/* Patch note */}
           {result.note && (
             <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm leading-6 text-slate-300">
-              <b className="text-slate-200">Patch note:</b>{" "}
+              <b className="text-slate-200">
+                Patch note:
+              </b>{" "}
               {result.note}
             </div>
           )}
@@ -70,24 +86,30 @@ export default function DebugPanel({ result }: { result: any }) {
                 </p>
 
                 <pre className="overflow-x-auto rounded-xl border border-cyan-400/20 bg-black/30 p-4 text-sm leading-6 text-slate-200">
-                  <code>{suggestedFix.code}</code>
+                  <code>
+                    {suggestedFix.code}
+                  </code>
                 </pre>
               </div>
 
               {/* Suggestion details */}
               <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-sm leading-6 text-amber-200/80">
+
                 <p>
                   <b>Suggested change:</b>{" "}
-                  Qubit {suggestedFix.invalid_qubit} →{" "}
-                  Qubit {suggestedFix.suggested_qubit}
+                  Qubit {suggestedFix.invalid_qubit}{" "}
+                  → Qubit{" "}
+                  {suggestedFix.suggested_qubit}
                 </p>
 
                 <p className="mt-1">
-                  <b>Gate:</b> {suggestedFix.gate}
+                  <b>Gate:</b>{" "}
+                  {suggestedFix.gate}
                 </p>
 
                 <p className="mt-1">
-                  <b>Line:</b> {suggestedFix.line}
+                  <b>Line:</b>{" "}
+                  {suggestedFix.line}
                 </p>
 
                 {suggestedFix.warning && (
@@ -95,23 +117,42 @@ export default function DebugPanel({ result }: { result: any }) {
                     ⚠ {suggestedFix.warning}
                   </p>
                 )}
+
               </div>
+
+              {/* Apply Suggested Fix button */}
+              {onApplyFix && (
+                <button
+                  type="button"
+                  className="btn btn-primary w-full"
+                  onClick={() =>
+                    onApplyFix(
+                      suggestedFix.code
+                    )
+                  }
+                >
+                  Apply Suggested Fix
+                </button>
+              )}
 
             </div>
           )}
 
           {/* Automatically fixed code */}
-          {result.changed && result.fixed_code && (
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-                Fixed code
-              </p>
+          {result.changed &&
+            result.fixed_code && (
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Fixed code
+                </p>
 
-              <pre className="overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-6 text-slate-200">
-                <code>{result.fixed_code}</code>
-              </pre>
-            </div>
-          )}
+                <pre className="overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-6 text-slate-200">
+                  <code>
+                    {result.fixed_code}
+                  </code>
+                </pre>
+              </div>
+            )}
 
         </div>
       )}
