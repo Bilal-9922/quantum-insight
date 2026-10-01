@@ -7,6 +7,7 @@ import MetricCard from "../../components/MetricCard";
 import HealthScore from "../../components/HealthScore";
 import HealthChart from "../../components/HealthChart";
 import CircuitViewer from "../../components/CircuitViewer";
+import HardwareRecommendations from "../../components/HardwareRecommendations";
 import AIRecommendation from "../../components/AIRecommendation";
 import { Icon } from "../../components/Icons";
 import { useRequireAuth } from "../../lib/auth";
@@ -445,13 +446,18 @@ export default function Analyzer() {
             />
           </div>
 
-          {/* Circuit */}
-          <CircuitViewer circuit={data.circuit} />
-
-          {/* Recommendations */}
-          <AIRecommendation
-            data={data.recommendations}
-          />
+        {/* Circuit */}
+        <CircuitViewer circuit={data.circuit} />
+        
+        {/* Hardware Recommendations */}
+        <HardwareRecommendations
+          data={data.hardware_recommendations}
+        />
+        
+        {/* AI Recommendations */}
+        <AIRecommendation
+          data={data.recommendations}
+        />
         </section>
       )}
     </div>
