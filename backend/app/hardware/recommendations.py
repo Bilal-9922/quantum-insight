@@ -1,10 +1,6 @@
 from typing import Any, Dict, List
 
 
-def _clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
-    return max(minimum, min(maximum, value))
-
-
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -19,17 +15,22 @@ def generate_hardware_recommendations(
     """
     Generate hardware-oriented recommendations from circuit metrics.
 
-    This module does not claim live backend availability or live calibration
-    data. Recommendations are based on structural circuit characteristics
-    such as qubit count, depth, two-qubit operations, gate density, and
-    estimated noise exposure.
+    The recommendations are based on circuit-level characteristics and
+    available noise analysis. This function does not use live backend
+    availability, queue information, calibration data, or current hardware
+    error rates.
     """
 
     noise = noise or {}
 
+    # ---------------------------------------------------------
+    # Circuit metrics
+    # ---------------------------------------------------------
+
     qubits = int(_safe_float(metrics.get("qubits"), 0))
     gate_count = int(_safe_float(metrics.get("gate_count"), 0))
     depth = int(_safe_float(metrics.get("depth"), 0))
+
     two_qubit_gates = int(
         _safe_float(metrics.get("two_qubit_gates"), 0)
     )
@@ -49,38 +50,51 @@ def generate_hardware_recommendations(
         0.0,
     )
 
-    noise_score = _safe_float(
-        noise.get("score")
-        if isinstance(noise, dict)
-        else None,
+    # ---------------------------------------------------------
+    # Noise analysis
+    # ---------------------------------------------------------
+
+    # Existing analyzer returns noise_exposure_percent.
+    # Example:
+    # noise_exposure_percent = 69.1
+    #
+    # Convert percentage to a normalized 0-1 value.
+    noise_exposure_percent = _safe_float(
+        noise.get("noise_exposure_percent"),
         0.0,
     )
+
+    noise_score = noise_exposure_percent / 100.0
+
+    # Keep the value inside the expected 0-1 range.
+    noise_score = max(0.0, min(1.0, noise_score))
 
     recommendations: List[Dict[str, Any]] = []
 
     # ---------------------------------------------------------
-    # Qubit requirements
+    # Qubit capacity
     # ---------------------------------------------------------
+
     if qubits <= 5:
+        qubit_level = "low"
         qubit_message = (
             "Small qubit requirement. The circuit is suitable for "
             "small-scale hardware experiments and educational testing."
         )
-        qubit_level = "low"
     elif qubits <= 20:
+        qubit_level = "moderate"
         qubit_message = (
             "Moderate qubit requirement. Consider hardware with enough "
-            "available qubits while leaving some routing and connectivity "
+            "available qubits while leaving routing and connectivity "
             "headroom."
         )
-        qubit_level = "moderate"
     else:
+        qubit_level = "high"
         qubit_message = (
             "High qubit requirement. Prefer hardware with a sufficiently "
             "large qubit count and good connectivity to reduce routing "
             "overhead."
         )
-        qubit_level = "high"
 
     recommendations.append(
         {
@@ -95,6 +109,7 @@ def generate_hardware_recommendations(
     # ---------------------------------------------------------
     # Circuit depth
     # ---------------------------------------------------------
+
     if depth <= 5:
         depth_level = "low"
         depth_message = (
@@ -126,8 +141,9 @@ def generate_hardware_recommendations(
     )
 
     # ---------------------------------------------------------
-    # Two-qubit gates
+    # Two-qubit connectivity
     # ---------------------------------------------------------
+
     if two_qubit_ratio <= 0.20:
         two_qubit_level = "low"
         two_qubit_message = (
@@ -160,6 +176,7 @@ def generate_hardware_recommendations(
     # ---------------------------------------------------------
     # Gate density
     # ---------------------------------------------------------
+
     if gate_density <= 0.50:
         density_level = "low"
         density_message = (
@@ -192,23 +209,27 @@ def generate_hardware_recommendations(
     # ---------------------------------------------------------
     # Noise exposure
     # ---------------------------------------------------------
+
     if noise_score >= 0.70:
         noise_level = "high"
         noise_message = (
-            "Estimated noise exposure is high. Prefer lower-noise hardware "
+            f"Estimated noise exposure is high at "
+            f"{noise_exposure_percent:.1f}%. Prefer lower-noise hardware "
             "and validate the circuit under a realistic noise model before "
             "hardware execution."
         )
     elif noise_score >= 0.40:
         noise_level = "moderate"
         noise_message = (
-            "Estimated noise exposure is moderate. Hardware calibration "
-            "quality and gate fidelity should be considered before execution."
+            f"Estimated noise exposure is moderate at "
+            f"{noise_exposure_percent:.1f}%. Hardware calibration quality "
+            "and gate fidelity should be considered before execution."
         )
     else:
         noise_level = "low"
         noise_message = (
-            "Estimated noise exposure is relatively low from the available "
+            f"Estimated noise exposure is relatively low at "
+            f"{noise_exposure_percent:.1f}% based on the available "
             "circuit analysis."
         )
 
@@ -223,8 +244,86 @@ def generate_hardware_recommendations(
     )
 
     # ---------------------------------------------------------
-    # Overall hardware guidance
+    # Hardware system profile
     # ---------------------------------------------------------
+
+    # This is a hardware PROFILE recommendation, not a claim about
+    # a currently available specific backend.
+    #
+    # The current analysis does not contain live backend information,
+    # so we recommend a suitable hardware architecture rather than
+    # inventing a specific backend name.
+
+    if two_qubit_ratio > 0.50:
+        hardware_system = "Superconducting QPU"
+        hardware_system_reason = (
+            "The circuit contains a high concentration of two-qubit "
+            "operations, making reliable entangling gates and suitable "
+            "qubit connectivity important."
+        )
+    elif depth > 20 or noise_score >= 0.70:
+        hardware_system = "Low-noise quantum processor"
+        hardware_system_reason = (
+            "The circuit has significant execution or noise exposure, "
+            "so low-noise operation and strong gate fidelity are important."
+        )
+    elif qubits <= 5 and depth <= 5:
+        hardware_system = "Small-scale superconducting QPU"
+        hardware_system_reason = (
+            "The circuit requires few qubits and has low depth, making "
+            "a small-scale quantum processor suitable for experimentation."
+        )
+    else:
+        hardware_system = "Superconducting QPU"
+        hardware_system_reason = (
+            "The circuit requires a gate-based quantum processor with "
+            "sufficient qubit capacity and reliable gate execution."
+        )
+
+    recommendations.insert(
+        0,
+        {
+            "type": "hardware_system",
+            "priority": "high",
+            "title": "Recommended Hardware System",
+            "message": (
+                f"{hardware_system}. {hardware_system_reason}"
+            ),
+            "metric": qubits,
+            "hardware_system": hardware_system,
+        },
+    )
+
+    # ---------------------------------------------------------
+    # Hardware characteristics
+    # ---------------------------------------------------------
+
+    if two_qubit_ratio > 0.50:
+        connectivity_importance = "high"
+    elif two_qubit_ratio > 0.20:
+        connectivity_importance = "moderate"
+    else:
+        connectivity_importance = "low"
+
+    if depth > 20 or two_qubit_ratio > 0.50:
+        gate_fidelity_importance = "high"
+    elif depth > 5 or two_qubit_ratio > 0.20:
+        gate_fidelity_importance = "moderate"
+    else:
+        gate_fidelity_importance = "low"
+
+    hardware_characteristics = {
+        "minimum_qubits": qubits,
+        "connectivity_importance": connectivity_importance,
+        "gate_fidelity_importance": gate_fidelity_importance,
+        "noise_sensitivity": noise_level,
+        "recommended_hardware_system": hardware_system,
+    }
+
+    # ---------------------------------------------------------
+    # Overall hardware execution risk
+    # ---------------------------------------------------------
+
     risk_values = {
         "low": 0,
         "moderate": 1,
@@ -250,8 +349,8 @@ def generate_hardware_recommendations(
         execution_level = "moderate"
         summary = (
             "The circuit has moderate hardware requirements. "
-            "Hardware connectivity, gate fidelity, and transpilation "
-            "should be reviewed before execution."
+            "Hardware connectivity, gate fidelity, noise exposure, and "
+            "transpilation should be reviewed before execution."
         )
     else:
         execution_level = "challenging"
@@ -262,33 +361,29 @@ def generate_hardware_recommendations(
         )
 
     # ---------------------------------------------------------
-    # Hardware characteristics
+    # Return hardware recommendation data
     # ---------------------------------------------------------
-    hardware_characteristics = {
-        "minimum_qubits": qubits,
-        "connectivity_importance": (
-            "high"
-            if two_qubit_ratio > 0.50
-            else "moderate"
-            if two_qubit_ratio > 0.20
-            else "low"
-        ),
-        "gate_fidelity_importance": (
-            "high"
-            if depth > 20 or two_qubit_ratio > 0.50
-            else "moderate"
-            if depth > 5 or two_qubit_ratio > 0.20
-            else "low"
-        ),
-        "noise_sensitivity": noise_level,
-    }
 
     return {
         "available": True,
+
         "execution_level": execution_level,
+
         "summary": summary,
+
+        "recommended_hardware": {
+            "system": hardware_system,
+            "reason": hardware_system_reason,
+            "minimum_qubits": qubits,
+            "connectivity_requirement": connectivity_importance,
+            "gate_fidelity_requirement": gate_fidelity_importance,
+            "noise_sensitivity": noise_level,
+        },
+
         "hardware_characteristics": hardware_characteristics,
+
         "recommendations": recommendations,
+
         "basis": {
             "qubits": qubits,
             "gate_count": gate_count,
@@ -298,10 +393,16 @@ def generate_hardware_recommendations(
             "gate_density": round(gate_density, 4),
             "qubit_utilization": round(qubit_utilization, 4),
             "noise_score": round(noise_score, 4),
+            "noise_exposure_percent": round(
+                noise_exposure_percent,
+                1,
+            ),
         },
+
         "disclaimer": (
-            "These recommendations are based on circuit-level metrics "
-            "and available noise analysis. They do not represent live "
-            "hardware calibration, queue, or backend availability data."
+            "Hardware system recommendations are based on circuit-level "
+            "metrics and available noise analysis. They do not represent "
+            "live hardware calibration, queue status, backend availability, "
+            "or current hardware error rates."
         ),
     }
