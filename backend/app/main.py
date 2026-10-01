@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
@@ -75,3 +75,8 @@ def healthcheck():
     return {
         "status": "healthy",
     }
+
+
+@app.head("/api/healthcheck")
+def healthcheck_head():
+    return Response(status_code=200)
