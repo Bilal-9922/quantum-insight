@@ -202,15 +202,15 @@ export default function Dashboard() {
           0
         ) / analyses
       : null;
-  
+
   const averageQMI =
-  analyses > 0
-    ? history.reduce(
-        (sum, item) =>
-          sum + Number(item.qmi_score || 0),
-        0
-      ) / analyses
-    : null;
+    analyses > 0
+      ? history.reduce(
+          (sum, item) =>
+            sum + Number(item.qmi_score || 0),
+          0
+        ) / analyses
+      : null;
 
   const averageAnomaly =
     analyses > 0
@@ -341,6 +341,23 @@ export default function Dashboard() {
         />
 
         <Metric
+          label="QMI average"
+          value={
+            historyLoading
+              ? "…"
+              : averageQMI !== null
+              ? averageQMI.toFixed(1)
+              : "—"
+          }
+          note={
+            averageQMI !== null
+              ? "Across saved analyses"
+              : "Run an analysis to calculate"
+          }
+          icon="analyze"
+        />
+
+        <Metric
           label="Analyses"
           value={
             historyLoading
@@ -366,23 +383,6 @@ export default function Dashboard() {
               : "Awaiting circuit data"
           }
           icon="bug"
-        />
-
-        <Metric
-          label="Latest QHI"
-          value={
-            historyLoading
-              ? "…"
-              : latestQHI !== null
-              ? latestQHI.toFixed(1)
-              : "—"
-          }
-          note={
-            latestQHI !== null
-              ? history[0].health_category
-              : "No analysis yet"
-          }
-          icon="analyze"
         />
       </section>
 
