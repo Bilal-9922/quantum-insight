@@ -98,13 +98,11 @@ def analyze(
         # Hardware Recommendations
         # -----------------------------------------------------
 
-        hardware_recommendations = (
-            generate_hardware_recommendations(
-                metrics=metrics,
-                noise=noise,
-            )
+        hardware_recommendations = generate_hardware_recommendations(
+            metrics=metrics,
+            noise=noise,
+            source_code=code,
         )
-
         # -----------------------------------------------------
         # Quantum Maintainability Index
         # -----------------------------------------------------
