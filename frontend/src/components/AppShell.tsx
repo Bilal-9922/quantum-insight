@@ -13,7 +13,7 @@ const nav = [
   ["/debugger", "AI Debugger", "bug"],
   ["/optimizer", "Optimizer", "zap"],
   ["/history", "History", "history"],
-  ["/profile", "Profile", "user"],
+  ["/settings", "Settings", "settings"],
 ];
 
 export default function AppShell({
@@ -38,10 +38,10 @@ export default function AppShell({
       <aside
         className={`sidebar ${
           open ? "sidebar-open" : ""
-        }`}
+        } flex flex-col overflow-y-auto`}
       >
         {/* Brand */}
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-5">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-5 py-5">
           <Link
             href="/dashboard"
             onClick={() => setOpen(false)}
@@ -61,7 +61,7 @@ export default function AppShell({
         </div>
 
         {/* Navigation */}
-        <div className="px-4 py-5">
+        <div className="shrink-0 px-4 py-5">
           <div className="mb-3 flex items-center justify-between px-2">
             <div className="side-label">
               Workspace
@@ -111,8 +111,11 @@ export default function AppShell({
           </nav>
         </div>
 
+        {/* Spacer */}
+        <div className="min-h-4 flex-1" />
+
         {/* Lab Card */}
-        <div className="mt-auto px-4 pb-4">
+        <div className="shrink-0 px-4 pb-4">
           <div className="upgrade-card relative overflow-hidden">
             <div className="absolute -right-8 -top-8 h-20 w-20 rounded-full bg-cyan-400/10 blur-2xl" />
 
@@ -145,8 +148,12 @@ export default function AppShell({
         </div>
 
         {/* Account */}
-        <div className="border-t border-white/5 p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-3">
+        <div className="sticky bottom-0 z-10 shrink-0 border-t border-white/5 bg-slate-950/95 p-4 backdrop-blur-xl">
+          <Link
+            href="/settings"
+            onClick={() => setOpen(false)}
+            className="mb-3 flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-3 transition hover:border-cyan-400/10 hover:bg-white/[0.04]"
+          >
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-cyan-400/20 bg-cyan-400/10 text-sm font-black text-cyan-300">
               {user?.name?.slice(0, 1).toUpperCase() ||
                 "Q"}
@@ -161,7 +168,13 @@ export default function AppShell({
                 {user?.email || "Authenticated"}
               </p>
             </div>
-          </div>
+
+            <Icon
+              name="arrow"
+              size={13}
+              className="ml-auto rotate-[-45deg] text-slate-600"
+            />
+          </Link>
 
           <button
             type="button"
@@ -212,9 +225,9 @@ export default function AppShell({
             </Link>
 
             <Link
-              href="/profile"
+              href="/settings"
               className="group flex items-center gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-2 py-1.5 transition hover:border-cyan-400/10 hover:bg-white/[0.04]"
-              title={user?.name || "Profile"}
+              title={user?.name || "Settings"}
             >
               <span className="avatar">
                 {user?.name?.slice(0, 1).toUpperCase() ||
@@ -222,7 +235,7 @@ export default function AppShell({
               </span>
 
               <span className="hidden max-w-[120px] truncate text-xs font-semibold text-slate-400 transition group-hover:text-slate-200 md:block">
-                {user?.name || "Profile"}
+                {user?.name || "Settings"}
               </span>
             </Link>
           </div>
