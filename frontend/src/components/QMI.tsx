@@ -34,33 +34,25 @@ function getCategoryClasses(category?: string) {
   switch (category) {
     case "Excellent":
       return {
-        badge:
-          "border-emerald-400/20 bg-emerald-400/10 text-emerald-300",
-        score: "text-emerald-300",
+        label: "text-emerald-300",
         bar: "bg-emerald-400",
       };
 
     case "Good":
       return {
-        badge:
-          "border-cyan-400/20 bg-cyan-400/10 text-cyan-300",
-        score: "text-cyan-300",
+        label: "text-cyan-300",
         bar: "bg-cyan-400",
       };
 
     case "Moderate":
       return {
-        badge:
-          "border-amber-400/20 bg-amber-400/10 text-amber-300",
-        score: "text-amber-300",
+        label: "text-amber-300",
         bar: "bg-amber-400",
       };
 
     default:
       return {
-        badge:
-          "border-rose-400/20 bg-rose-400/10 text-rose-300",
-        score: "text-rose-300",
+        label: "text-rose-300",
         bar: "bg-rose-400",
       };
   }
@@ -69,265 +61,240 @@ function getCategoryClasses(category?: string) {
 export default function QMI({ data }: Props) {
   if (!data) return null;
 
-  const styles = getCategoryClasses(
-    data.category
-  );
+  const styles = getCategoryClasses(data.category);
 
   const components = Object.keys(
     componentLabels
   ) as Array<keyof QMIType["components"]>;
 
+  const safeScore = Math.max(
+    0,
+    Math.min(100, Number(data.score) || 0)
+  );
+
   return (
     <section className="card overflow-hidden">
-
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
-
-      <div className="border-b border-white/5 px-5 py-5 sm:px-6">
-
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-
+      {/* Header */}
+      <div className="border-b border-white/10 px-5 py-5 sm:px-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-
-            <p className="section-kicker">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">
               Maintainability analysis
             </p>
 
-            <h3 className="mt-1 text-lg font-bold text-white">
+            <h3 className="mt-1 text-lg font-semibold text-white">
               Quantum Maintainability Index
             </h3>
 
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">
-              Measures how easy the analyzed quantum circuit is
-              to understand, maintain, modify and scale.
+            <p className="mt-2 max-w-xl text-xs leading-5 text-slate-500">
+              Measures how easily the analyzed circuit can be
+              understood, maintained, modified and scaled.
+            </p>
+          </div>
+
+          <div className="shrink-0 text-right">
+            <p className="font-mono text-[10px] text-slate-600">
+              QMI
             </p>
 
+            <p
+              className={`mt-1 text-xs font-semibold ${styles.label}`}
+            >
+              {data.category || "Unknown"}
+            </p>
           </div>
-
-          <span
-            className={`inline-flex w-fit items-center rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] ${styles.badge}`}
-          >
-            {data.category || "Unknown"}
-          </span>
-
         </div>
-
       </div>
 
-      {/* =====================================================
-          SCORE
-      ===================================================== */}
+      {/* Score */}
+      <div className="border-b border-white/10 p-5 sm:p-6">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div
+              className={`font-mono text-5xl font-semibold tracking-tight ${styles.label}`}
+            >
+              {typeof data.score === "number"
+                ? data.score.toFixed(1)
+                : "—"}
+            </div>
 
-      <div className="grid gap-5 border-b border-white/5 p-5 sm:grid-cols-[180px_1fr] sm:items-center sm:p-6">
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <span className="text-slate-500">
+                Maintainability score
+              </span>
 
-        <div className="text-center sm:text-left">
+              <span className="text-slate-700">
+                ·
+              </span>
 
-          <div
-            className={`text-5xl font-black tracking-tight ${styles.score}`}
-          >
-            {typeof data.score === "number"
-              ? data.score.toFixed(1)
-              : "—"}
+              <span className={styles.label}>
+                {data.category || "Unknown"}
+              </span>
+            </div>
           </div>
 
-          <div className="mt-1 text-xs font-semibold text-slate-400">
-            / 100
-          </div>
+          <div className="text-right">
+            <p className="font-mono text-xs text-slate-500">
+              / 100
+            </p>
 
-          <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-            Maintainability Score
+            <p className="mt-1 text-[9px] uppercase tracking-wider text-slate-600">
+              Normalized
+            </p>
           </div>
-
         </div>
 
-        <div>
-
+        <div className="mt-6">
           <div className="mb-2 flex items-center justify-between">
-
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-              Overall QMI
+            <span className="text-[9px] uppercase tracking-wider text-slate-600">
+              Maintainability scale
             </span>
 
-            <span className={`text-xs font-bold ${styles.score}`}>
-              {data.category}
+            <span
+              className={`font-mono text-[10px] ${styles.label}`}
+            >
+              {safeScore.toFixed(1)}%
             </span>
-
           </div>
 
-          <div className="h-3 overflow-hidden rounded-full bg-white/5">
-
+          <div className="h-2 overflow-hidden rounded-sm bg-slate-800">
             <div
-              className={`h-full rounded-full transition-all duration-700 ${styles.bar}`}
+              className={`h-full transition-all duration-500 ${styles.bar}`}
               style={{
-                width: `${Math.max(
-                  0,
-                  Math.min(
-                    100,
-                    data.score || 0
-                  )
-                )}%`,
+                width: `${safeScore}%`,
               }}
             />
-
           </div>
 
-          <p className="mt-3 text-[11px] leading-5 text-slate-400">
-            Higher QMI indicates a circuit that is generally
-            easier to understand, maintain and extend.
-          </p>
-
+          <div className="mt-2 flex justify-between font-mono text-[9px] text-slate-600">
+            <span>0</span>
+            <span>25</span>
+            <span>50</span>
+            <span>75</span>
+            <span>100</span>
+          </div>
         </div>
 
+        <p className="mt-5 border-t border-white/10 pt-4 text-[10px] leading-5 text-slate-600">
+          Higher QMI indicates stronger maintainability based
+          on the measured circuit characteristics.
+        </p>
       </div>
 
-      {/* =====================================================
-          COMPONENT SCORES
-      ===================================================== */}
-
+      {/* Components */}
       <div className="p-5 sm:p-6">
-
         <div className="mb-4">
-
-          <p className="text-sm font-bold text-white">
+          <p className="text-sm font-semibold text-white">
             Maintainability components
           </p>
 
-          <p className="mt-1 text-[11px] text-slate-400">
-            Weighted factors contributing to the QMI score.
+          <p className="mt-1 text-[10px] leading-5 text-slate-500">
+            Weighted factors contributing to the overall QMI.
           </p>
-
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3">
+          {components.map((key) => {
+            const value = Math.max(
+              0,
+              Math.min(
+                100,
+                Number(data.components?.[key]) || 0
+              )
+            );
 
-          {components.map(
-            (key) => {
+            return (
+              <div
+                key={key}
+                className="border-b border-white/5 pb-3 last:border-0 last:pb-0"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-200">
+                      {componentLabels[key]}
+                    </p>
 
-              const value =
-                data.components?.[key] ?? 0;
-
-              return (
-                <div
-                  key={key}
-                  className="rounded-2xl border border-white/10 bg-white/[.025] p-4"
-                >
-
-                  <div className="flex items-start justify-between gap-3">
-
-                    <div>
-
-                      <p className="text-xs font-bold text-white">
-                        {componentLabels[key]}
-                      </p>
-
-                      <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Weight{" "}
-                        {componentWeights[key]}
-                      </p>
-
-                    </div>
-
-                    <span className="text-sm font-black text-cyan-300">
-                      {value.toFixed(1)}
-                    </span>
-
+                    <p className="mt-1 font-mono text-[9px] uppercase tracking-wider text-slate-600">
+                      Weight {componentWeights[key]}
+                    </p>
                   </div>
 
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
-
-                    <div
-                      className="h-full rounded-full bg-cyan-400"
-                      style={{
-                        width: `${Math.max(
-                          0,
-                          Math.min(
-                            100,
-                            value
-                          )
-                        )}%`,
-                      }}
-                    />
-
-                  </div>
-
+                  <span className="shrink-0 font-mono text-xs text-cyan-300">
+                    {value.toFixed(1)}
+                  </span>
                 </div>
-              );
-            }
-          )}
 
+                <div className="mt-2 h-1.5 overflow-hidden rounded-sm bg-slate-800">
+                  <div
+                    className="h-full bg-cyan-400 transition-all duration-500"
+                    style={{
+                      width: `${value}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* =================================================
-            SCORE BASIS
-        ================================================= */}
-
+        {/* Analysis basis */}
         {data.basis && (
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/15 p-4">
-
-            <div className="mb-3">
-
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <div className="mb-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                 Analysis basis
               </p>
 
-              <p className="mt-1 text-[10px] text-slate-500">
+              <p className="mt-1 text-[10px] leading-5 text-slate-600">
                 Circuit characteristics used to calculate
                 maintainability.
               </p>
-
             </div>
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
               <div>
-                <p className="text-[9px] text-slate-400">
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">
                   Qubits
                 </p>
 
-                <p className="mt-1 text-xs font-bold text-white">
+                <p className="mt-1 font-mono text-xs text-slate-300">
                   {data.basis.qubits ?? "—"}
                 </p>
               </div>
 
               <div>
-                <p className="text-[9px] text-slate-400">
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">
                   Gates
                 </p>
 
-                <p className="mt-1 text-xs font-bold text-white">
+                <p className="mt-1 font-mono text-xs text-slate-300">
                   {data.basis.gate_count ?? "—"}
                 </p>
               </div>
 
               <div>
-                <p className="text-[9px] text-slate-400">
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">
                   Depth
                 </p>
 
-                <p className="mt-1 text-xs font-bold text-white">
+                <p className="mt-1 font-mono text-xs text-slate-300">
                   {data.basis.depth ?? "—"}
                 </p>
               </div>
 
               <div>
-                <p className="text-[9px] text-slate-400">
-                  Gate Types
+                <p className="text-[9px] uppercase tracking-wider text-slate-600">
+                  Gate types
                 </p>
 
-                <p className="mt-1 text-xs font-bold text-white">
-                  {data.basis
-                    .unique_gate_types ?? "—"}
+                <p className="mt-1 font-mono text-xs text-slate-300">
+                  {data.basis.unique_gate_types ?? "—"}
                 </p>
               </div>
-
             </div>
-
           </div>
         )}
-
       </div>
-
     </section>
   );
 }
