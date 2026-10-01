@@ -84,7 +84,6 @@ export default function Analyzer() {
     );
 
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
 
     link.href = url;
@@ -106,72 +105,66 @@ export default function Analyzer() {
   if (loading) return <Loading />;
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
 
       {/* =====================================================
-          HEADER
+          PAGE HEADER
       ===================================================== */}
 
-      <section className="relative overflow-hidden rounded-3xl border border-cyan-400/10 bg-gradient-to-br from-cyan-500/[.08] via-slate-950/60 to-violet-600/[.08] p-6 shadow-[0_20px_80px_rgba(0,0,0,.15)] sm:p-8">
+      <section className="border-b border-white/10 pb-6">
 
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 
-        <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+          <div className="max-w-3xl">
 
-          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400">
+              Circuit analysis
+            </p>
 
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,.8)]" />
-
-              <p className="section-kicker">
-                Quantum analysis
-              </p>
-            </div>
-
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
               Circuit Analyzer
             </h1>
 
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Turn Qiskit Python into engineering metrics,
-              quantum health signals, maintainability analysis,
-              anomaly detection and AI-powered recommendations.
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+              Inspect a Qiskit circuit and extract measurable engineering
+              characteristics, health indicators and optimization signals.
             </p>
 
           </div>
 
-          <div className="flex items-center gap-2 self-start rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-3 py-2 lg:self-auto">
+          <div className="flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-3 py-2">
 
-            <span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-400/10 text-cyan-300">
-              <Icon name="shield" size={13} />
+            <span className="grid h-7 w-7 place-items-center rounded-md border border-emerald-400/15 bg-emerald-400/5 text-emerald-300">
+              <Icon name="shield" size={14} />
             </span>
 
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-300">
-                Static-safe parser
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+                Static analysis
               </p>
 
-              <p className="text-[10px] text-slate-600">
-                Source is analyzed safely
+              <p className="text-[10px] text-slate-500">
+                Submitted source is not executed directly
               </p>
             </div>
 
           </div>
 
         </div>
+
       </section>
 
       {/* =====================================================
-          EDITOR + INFORMATION
+          SOURCE + ANALYSIS INFORMATION
       ===================================================== */}
 
-      <section className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
+      <section className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
 
-        {/* Code editor */}
+        {/* Source editor */}
 
         <div className="card overflow-hidden">
 
-          <div className="border-b border-white/5 px-5 py-4 sm:px-6">
+          <div className="border-b border-white/10 px-5 py-4 sm:px-6">
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
@@ -179,18 +172,18 @@ export default function Analyzer() {
 
                 <div className="flex items-center gap-2">
 
-                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-cyan-400/10 text-cyan-300">
+                  <span className="grid h-7 w-7 place-items-center rounded-md border border-cyan-400/15 bg-cyan-400/5 text-cyan-300">
                     <Icon name="analyze" size={14} />
                   </span>
 
-                  <p className="text-sm font-bold text-slate-200">
+                  <p className="text-sm font-semibold text-white">
                     Circuit source
                   </p>
 
                 </div>
 
-                <p className="mt-1 text-[11px] text-slate-600">
-                  Paste your Qiskit Python circuit below.
+                <p className="mt-1 text-xs text-slate-500">
+                  Paste Qiskit Python for static analysis.
                 </p>
 
               </div>
@@ -203,7 +196,7 @@ export default function Analyzer() {
                   setData(null);
                   setExported(false);
                 }}
-                className="self-start rounded-lg border border-white/5 bg-white/[.02] px-3 py-2 text-[11px] font-bold text-cyan-300 transition hover:border-cyan-400/10 hover:bg-cyan-400/5 sm:self-auto"
+                className="rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-cyan-400/20 hover:text-cyan-300"
               >
                 Load sample
               </button>
@@ -212,18 +205,20 @@ export default function Analyzer() {
 
           </div>
 
-          {/* Editor toolbar */}
+          {/* Editor header */}
 
-          <div className="flex items-center justify-between border-b border-white/5 bg-black/10 px-4 py-2">
+          <div className="flex items-center justify-between border-b border-white/10 bg-slate-950 px-4 py-2">
 
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-rose-400/60" />
-              <span className="h-2 w-2 rounded-full bg-amber-400/60" />
-              <span className="h-2 w-2 rounded-full bg-emerald-400/60" />
+
+              <span className="h-2 w-2 rounded-full bg-slate-600" />
+              <span className="h-2 w-2 rounded-full bg-slate-600" />
+              <span className="h-2 w-2 rounded-full bg-slate-600" />
+
             </div>
 
-            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-700">
-              Python
+            <span className="font-mono text-[10px] text-slate-600">
+              qiskit.py
             </span>
 
           </div>
@@ -232,7 +227,7 @@ export default function Analyzer() {
 
             <textarea
               spellCheck={false}
-              className="code-editor min-h-[320px] w-full resize-y"
+              className="code-editor min-h-[340px] w-full resize-y"
               value={code}
               onChange={(e) => {
                 setCode(e.target.value);
@@ -243,7 +238,7 @@ export default function Analyzer() {
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
-              <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+              <div className="flex flex-wrap items-center gap-3 font-mono text-[10px] text-slate-600">
 
                 <span>
                   {code.split("\n").length} lines
@@ -253,12 +248,6 @@ export default function Analyzer() {
 
                 <span>
                   {code.length} characters
-                </span>
-
-                <span className="h-1 w-1 rounded-full bg-slate-700" />
-
-                <span className="text-cyan-400/60">
-                  Python
                 </span>
 
               </div>
@@ -289,120 +278,105 @@ export default function Analyzer() {
 
         </div>
 
-        {/* What you get */}
+        {/* Analysis scope */}
 
-        <div className="card relative overflow-hidden p-5 sm:p-6">
+        <div className="card p-5 sm:p-6">
 
-          <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-violet-400/5 blur-3xl" />
+          <div>
 
-          <div className="relative">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-400">
+              Analysis scope
+            </p>
 
-            <div className="flex items-start justify-between">
+            <h2 className="mt-2 text-xl font-bold text-white">
+              What is measured
+            </h2>
 
-              <div>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              The analyzer converts circuit structure into measurable
+              characteristics and engineering signals.
+            </p>
 
-                <p className="section-kicker">
-                  Analysis pipeline
-                </p>
+          </div>
 
-                <h2 className="mt-1 text-xl font-bold text-white">
-                  What you get
-                </h2>
+          <div className="mt-6 space-y-3">
 
-              </div>
+            {[
+              [
+                "01",
+                "Circuit metrics",
+                "Qubits, gates, depth and two-qubit operations.",
+                "analyze",
+              ],
+              [
+                "02",
+                "Circuit health",
+                "Six components contributing to the QHI score.",
+                "shield",
+              ],
+              [
+                "03",
+                "Maintainability",
+                "Readability, efficiency, modularity and scalability.",
+                "spark",
+              ],
+              [
+                "04",
+                "Anomaly detection",
+                "Feature-based detection of unusual circuit patterns.",
+                "bug",
+              ],
+              [
+                "05",
+                "Recommendations",
+                "Potential improvements based on detected characteristics.",
+                "zap",
+              ],
+            ].map(([number, title, description, icon]) => (
+              <div
+                key={number}
+                className="border-b border-white/5 pb-3 last:border-0 last:pb-0"
+              >
+                <div className="flex gap-3">
 
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-violet-400/10 text-violet-300">
-                <Icon name="spark" size={17} />
-              </div>
+                  <span className="font-mono text-[10px] text-cyan-500">
+                    {number}
+                  </span>
 
-            </div>
+                  <div className="min-w-0 flex-1">
 
-            <div className="mt-6 space-y-2">
+                    <div className="flex items-center gap-2">
 
-              {[
-                [
-                  "01",
-                  "Circuit metrics",
-                  "Qubits, gates, depth and 2-qubit ratio",
-                  "analyze",
-                ],
-                [
-                  "02",
-                  "Quantum Health Index",
-                  "Six normalized health components",
-                  "shield",
-                ],
-                [
-                  "03",
-                  "Quantum Maintainability Index",
-                  "Maintainability, scalability and circuit quality",
-                  "spark",
-                ],
-                [
-                  "04",
-                  "Anomaly signal",
-                  "ML-based feature outlier detection",
-                  "bug",
-                ],
-                [
-                  "05",
-                  "Recommendations",
-                  "Actionable optimization guidance",
-                  "spark",
-                ],
-              ].map(
-                ([number, title, description, icon]) => (
-                  <div
-                    key={number}
-                    className="group rounded-2xl border border-white/5 bg-white/[.018] p-4 transition hover:border-cyan-400/10 hover:bg-cyan-400/[.02]"
-                  >
+                      <Icon
+                        name={icon}
+                        size={13}
+                        className="shrink-0 text-slate-500"
+                      />
 
-                    <div className="flex gap-3">
-
-                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-cyan-400/5 text-[10px] font-black text-cyan-300">
-                        {number}
-                      </span>
-
-                      <div className="min-w-0 flex-1">
-
-                        <div className="flex items-center justify-between gap-3">
-
-                          <p className="text-sm font-bold text-slate-200">
-                            {title}
-                          </p>
-
-                          <Icon
-                            name={icon}
-                            size={14}
-                            className="shrink-0 text-slate-700 transition group-hover:text-cyan-300"
-                          />
-
-                        </div>
-
-                        <p className="mt-1 text-xs leading-5 text-slate-600">
-                          {description}
-                        </p>
-
-                      </div>
+                      <p className="text-sm font-semibold text-slate-200">
+                        {title}
+                      </p>
 
                     </div>
 
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {description}
+                    </p>
+
                   </div>
-                )
-              )}
 
-            </div>
+                </div>
+              </div>
+            ))}
 
-            <div className="mt-5 rounded-xl border border-white/5 bg-black/10 px-4 py-3">
+          </div>
 
-              <p className="text-[10px] leading-5 text-slate-600">
-                Your submitted source is analyzed by the
-                QuantumInsight backend parser. The analyzer
-                does not directly execute your submitted
-                circuit.
-              </p>
+          <div className="mt-6 border-t border-white/10 pt-4">
 
-            </div>
+            <p className="text-[10px] leading-5 text-slate-600">
+              QuantumInsight performs static analysis of submitted source.
+              The circuit is not directly executed by the analyzer.
+            </p>
 
           </div>
 
@@ -415,7 +389,7 @@ export default function Analyzer() {
       ===================================================== */}
 
       {error && (
-        <div className="flex items-start gap-3 rounded-2xl border border-rose-400/20 bg-rose-400/5 p-4">
+        <div className="flex items-start gap-3 rounded-xl border border-rose-400/20 bg-rose-400/5 p-4">
 
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-400/10 text-rose-300">
             <Icon name="bug" size={16} />
@@ -441,7 +415,7 @@ export default function Analyzer() {
       ===================================================== */}
 
       {exported && (
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4">
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-400/15 bg-emerald-400/5 p-4">
 
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-400/10 text-emerald-300">
             <Icon name="check" size={16} />
@@ -471,70 +445,75 @@ export default function Analyzer() {
 
           {/* Results heading */}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
 
             <div>
 
-              <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">
+                Analysis complete
+              </p>
 
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,.7)]" />
-
-                <p className="section-kicker">
-                  Analysis complete
-                </p>
-
-              </div>
-
-              <h2 className="mt-1 text-xl font-bold text-white">
-                Circuit health report
+              <h2 className="mt-2 text-2xl font-bold text-white">
+                Circuit analysis results
               </h2>
 
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
-                QuantumInsight analysis
-              </span>
-
-              <button
-                type="button"
-                onClick={exportReport}
-                className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/10 bg-cyan-400/5 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-cyan-300 transition hover:border-cyan-400/20 hover:bg-cyan-400/10"
-              >
-                <Icon name="copy" size={13} />
-                Export Report
-              </button>
+              <p className="mt-1 text-sm text-slate-500">
+                Structural metrics, health indicators and engineering
+                recommendations for the submitted circuit.
+              </p>
 
             </div>
+
+            <button
+              type="button"
+              onClick={exportReport}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-cyan-400/20 hover:text-cyan-300"
+            >
+              <Icon name="copy" size={13} />
+              Export report
+            </button>
 
           </div>
 
           {/* =================================================
-              METRICS
+              CORE METRICS
           ================================================= */}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
 
-            <MetricCard
-              label="Qubits"
-              value={data.metrics.qubits}
-            />
+            <div className="mb-3 flex items-center gap-3">
 
-            <MetricCard
-              label="Gates"
-              value={data.metrics.gate_count}
-            />
+              <h3 className="text-sm font-semibold text-white">
+                Circuit metrics
+              </h3>
 
-            <MetricCard
-              label="Depth"
-              value={data.metrics.depth}
-            />
+              <span className="h-px flex-1 bg-white/10" />
 
-            <MetricCard
-              label="2Q Gates"
-              value={data.metrics.two_qubit_gates}
-            />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+              <MetricCard
+                label="Qubits"
+                value={data.metrics.qubits}
+              />
+
+              <MetricCard
+                label="Gates"
+                value={data.metrics.gate_count}
+              />
+
+              <MetricCard
+                label="Depth"
+                value={data.metrics.depth}
+              />
+
+              <MetricCard
+                label="2Q Gates"
+                value={data.metrics.two_qubit_gates}
+              />
+
+            </div>
 
           </div>
 
@@ -542,32 +521,38 @@ export default function Analyzer() {
               QHI + QMI
           ================================================= */}
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div>
 
-            {/* Quantum Health Index */}
+            <div className="mb-3 flex items-center gap-3">
 
-            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-white">
+                Circuit quality
+              </h3>
 
-              <HealthScore
-                score={data.health.score}
-                category={data.health.category}
-              />
-
-              <div className="mt-5">
-                <HealthChart
-                  components={data.health.components}
-                />
-              </div>
+              <span className="h-px flex-1 bg-white/10" />
 
             </div>
 
-            {/* Quantum Maintainability Index */}
+            <div className="grid gap-5 lg:grid-cols-2">
 
-            <div className="min-w-0">
+              <div className="min-w-0">
 
-              <QMI
-                data={data.qmi}
-              />
+                <HealthScore
+                  score={data.health.score}
+                  category={data.health.category}
+                />
+
+                <div className="mt-5">
+                  <HealthChart
+                    components={data.health.components}
+                  />
+                </div>
+
+              </div>
+
+              <div className="min-w-0">
+                <QMI data={data.qmi} />
+              </div>
 
             </div>
 
@@ -577,25 +562,67 @@ export default function Analyzer() {
               CIRCUIT
           ================================================= */}
 
-          <CircuitViewer
-            circuit={data.circuit}
-          />
+          <div>
+
+            <div className="mb-3 flex items-center gap-3">
+
+              <h3 className="text-sm font-semibold text-white">
+                Circuit structure
+              </h3>
+
+              <span className="h-px flex-1 bg-white/10" />
+
+            </div>
+
+            <CircuitViewer
+              circuit={data.circuit}
+            />
+
+          </div>
 
           {/* =================================================
-              HARDWARE RECOMMENDATIONS
+              HARDWARE
           ================================================= */}
 
-          <HardwareRecommendations
-            data={data.hardware_recommendations}
-          />
+          <div>
+
+            <div className="mb-3 flex items-center gap-3">
+
+              <h3 className="text-sm font-semibold text-white">
+                Hardware assessment
+              </h3>
+
+              <span className="h-px flex-1 bg-white/10" />
+
+            </div>
+
+            <HardwareRecommendations
+              data={data.hardware_recommendations}
+            />
+
+          </div>
 
           {/* =================================================
-              AI RECOMMENDATIONS
+              RECOMMENDATIONS
           ================================================= */}
 
-          <AIRecommendation
-            data={data.recommendations}
-          />
+          <div>
+
+            <div className="mb-3 flex items-center gap-3">
+
+              <h3 className="text-sm font-semibold text-white">
+                Recommendations
+              </h3>
+
+              <span className="h-px flex-1 bg-white/10" />
+
+            </div>
+
+            <AIRecommendation
+              data={data.recommendations}
+            />
+
+          </div>
 
         </section>
       )}
