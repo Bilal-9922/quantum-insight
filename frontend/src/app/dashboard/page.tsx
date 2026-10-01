@@ -202,6 +202,15 @@ export default function Dashboard() {
           0
         ) / analyses
       : null;
+  
+  const averageQMI =
+  analyses > 0
+    ? history.reduce(
+        (sum, item) =>
+          sum + Number(item.qmi_score || 0),
+        0
+      ) / analyses
+    : null;
 
   const averageAnomaly =
     analyses > 0
