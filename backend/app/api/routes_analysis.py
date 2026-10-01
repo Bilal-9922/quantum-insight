@@ -174,6 +174,9 @@ def analyze(
                         "health_category": health.get(
                             "category"
                         ),
+                        "qmi_score": qmi.get(
+                            "score"
+                        ),
                         "anomaly_score": (
                             anomaly.get("score")
                             if isinstance(
