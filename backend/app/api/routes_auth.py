@@ -16,6 +16,7 @@ from app.auth import (
 )
 from app.core.supabase import supabase
 
+
 router = APIRouter(tags=["authentication"])
 
 init_auth_db()
@@ -30,6 +31,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
 
 class GoogleLoginRequest(BaseModel):
     access_token: str
@@ -90,7 +92,9 @@ def me(user=Depends(current_user)):
 @router.post("/auth/google")
 def google_login(req: GoogleLoginRequest):
     try:
-        google_response = supabase.auth.get_user(req.access_token)
+        google_response = supabase.auth.get_user(
+            req.access_token
+        )
     except Exception:
         raise HTTPException(
             status_code=401,
@@ -105,7 +109,9 @@ def google_login(req: GoogleLoginRequest):
 
     google_user = google_response.user
 
-    email = (google_user.email or "").strip().lower()
+    email = (
+        google_user.email or ""
+    ).strip().lower()
 
     if not email:
         raise HTTPException(
@@ -168,7 +174,6 @@ def google_login(req: GoogleLoginRequest):
     }
 
 
-
 @router.post("/auth/forgot-password")
 def forgot_password(req: ForgotPasswordRequest):
     email = req.email.strip().lower()
@@ -195,7 +200,9 @@ def forgot_password(req: ForgotPasswordRequest):
 
     user = response.data[0]
 
-    token = create_password_reset_token(user["id"])
+    token = create_password_reset_token(
+        user["id"]
+    )
 
     frontend_url = os.getenv(
         "FRONTEND_URL",
@@ -206,7 +213,9 @@ def forgot_password(req: ForgotPasswordRequest):
         f"{frontend_url}/reset-password?token={token}"
     )
 
-    resend.api_key = os.getenv("RESEND_API_KEY")
+    resend.api_key = os.getenv(
+        "RESEND_API_KEY"
+    )
 
     if not resend.api_key:
         raise HTTPException(
@@ -263,13 +272,12 @@ def forgot_password(req: ForgotPasswordRequest):
             }
         )
 
-    except Exception as e:
+    except Exception:
+        # Do not expose third-party email-service errors
+        # or internal implementation details to the client.
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Failed to send password reset email: "
-                f"{str(e)}"
-            ),
+            detail="Unable to send password reset email.",
         )
 
     return {
@@ -282,7 +290,9 @@ def forgot_password(req: ForgotPasswordRequest):
 
 
 @router.post("/auth/reset-password")
-def reset_password_endpoint(req: ResetPasswordRequest):
+def reset_password_endpoint(
+    req: ResetPasswordRequest,
+):
     reset_password(
         req.token,
         req.password,
@@ -295,4 +305,3 @@ def reset_password_endpoint(req: ResetPasswordRequest):
             "You can now sign in."
         ),
     }
-
