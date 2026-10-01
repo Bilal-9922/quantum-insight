@@ -15,9 +15,7 @@ def _detect_hardware_target(
     """
     Detect hardware/provider information from submitted source code.
 
-    This performs static source inspection only.
-    It does not execute the submitted code and does not query
-    live hardware availability.
+    Static inspection only. The submitted code is never executed.
     """
 
     code = source_code or ""
@@ -39,44 +37,52 @@ def _detect_hardware_target(
     ibm_indicators = [
         "qiskit_ibm_runtime",
         "qiskitruntimeservice",
-        "qiskitruntimeservice(",
-        'channel="ibm_quantum"',
-        "channel='ibm_quantum'",
-        "ibm_quantum",
         "samplerv2",
+        "ibm_quantum",
     ]
 
-    if any(indicator in code_lower for indicator in ibm_indicators):
+    if any(
+        indicator in code_lower
+        for indicator in ibm_indicators
+    ):
         detected_provider = "IBM Quantum"
-        hardware_platform = "IBM Quantum / Qiskit Runtime"
+        hardware_platform = (
+            "IBM Quantum / Qiskit Runtime"
+        )
 
     # ---------------------------------------------------------
     # REAL HARDWARE VS SIMULATOR
     # ---------------------------------------------------------
 
-    if "simulator=False" in code or "simulator = False" in code_lower:
+    if re.search(
+        r"simulator\s*=\s*False",
+        code,
+        flags=re.IGNORECASE,
+    ):
         execution_target = "Real quantum hardware"
         simulator_requested = False
 
-    elif "simulator=True" in code or "simulator = True" in code_lower:
+    elif re.search(
+        r"simulator\s*=\s*True",
+        code,
+        flags=re.IGNORECASE,
+    ):
         execution_target = "Quantum simulator"
         simulator_requested = True
 
     # ---------------------------------------------------------
-    # IBM BACKEND SELECTION
+    # BACKEND SELECTION
     # ---------------------------------------------------------
 
-    least_busy_match = re.search(
-        r"least_busy\s*\((.*?)\)",
+    if re.search(
+        r"least_busy\s*\(",
         code,
-        flags=re.DOTALL,
-    )
-
-    if least_busy_match:
+        flags=re.IGNORECASE,
+    ):
         backend_selection = "Least-busy backend"
 
     # ---------------------------------------------------------
-    # MINIMUM QUBIT REQUIREMENT
+    # MINIMUM BACKEND QUBITS
     # ---------------------------------------------------------
 
     min_qubits_match = re.search(
@@ -86,7 +92,9 @@ def _detect_hardware_target(
     )
 
     if min_qubits_match:
-        minimum_qubits = int(min_qubits_match.group(1))
+        minimum_qubits = int(
+            min_qubits_match.group(1)
+        )
 
         hardware_constraints.append(
             f"Minimum backend size: {minimum_qubits} qubits"
@@ -96,12 +104,12 @@ def _detect_hardware_target(
     # EXPLICIT BACKEND NAME
     # ---------------------------------------------------------
 
-    backend_name_patterns = [
+    backend_patterns = [
         r'backend\s*=\s*["\']([^"\']+)["\']',
         r'backend_name\s*=\s*["\']([^"\']+)["\']',
     ]
 
-    for pattern in backend_name_patterns:
+    for pattern in backend_patterns:
         match = re.search(
             pattern,
             code,
@@ -119,18 +127,20 @@ def _detect_hardware_target(
     # IBM CHANNEL
     # ---------------------------------------------------------
 
-    ibm_channel_match = re.search(
+    channel_match = re.search(
         r'channel\s*=\s*["\']([^"\']+)["\']',
         code,
         flags=re.IGNORECASE,
     )
 
-    if ibm_channel_match:
-        channel = ibm_channel_match.group(1).strip()
+    if channel_match:
+        channel = channel_match.group(1).strip()
 
         if channel.lower() == "ibm_quantum":
             detected_provider = "IBM Quantum"
-            hardware_platform = "IBM Quantum / Qiskit Runtime"
+            hardware_platform = (
+                "IBM Quantum / Qiskit Runtime"
+            )
 
     # ---------------------------------------------------------
     # HARDWARE CONSTRAINTS
@@ -151,17 +161,8 @@ def _detect_hardware_target(
             f"Explicit backend: {backend_name}"
         )
 
-    # ---------------------------------------------------------
-    # DEFAULT / UNKNOWN
-    # ---------------------------------------------------------
-
-    if detected_provider:
-        detection_status = "detected"
-    else:
-        detection_status = "not_detected"
-
     return {
-        "detected": detection_status == "detected",
+        "detected": bool(detected_provider),
         "provider": detected_provider,
         "platform": hardware_platform,
         "execution_target": execution_target,
@@ -179,14 +180,18 @@ def generate_hardware_recommendations(
     source_code: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Generate hardware-oriented recommendations from circuit metrics,
-    noise analysis, and detected hardware information in source code.
+    Generate hardware-oriented recommendations using:
 
-    The submitted source code is inspected statically. It is never
-    executed by this function.
+    1. Circuit-level metrics.
+    2. Noise analysis.
+    3. Hardware/provider information statically detected
+       from the submitted source code.
 
-    Live backend availability, queue information, calibration data,
-    and current hardware error rates are not queried here.
+    Submitted source code is never executed.
+
+    This function does not query live backend availability,
+    queue information, calibration data, or current hardware
+    error rates.
     """
 
     noise = noise or {}
@@ -225,12 +230,16 @@ def generate_hardware_recommendations(
 
     two_qubit_ratio = _safe_float(
         metrics.get("two_qubit_ratio"),
-        two_qubit_gates / max(1, gate_count),
+        two_qubit_gates / max(
+            1,
+            gate_count,
+        ),
     )
 
     gate_density = _safe_float(
         metrics.get("gate_density"),
-        gate_count / max(
+        gate_count
+        / max(
             1,
             qubits * max(1, depth),
         ),
@@ -242,7 +251,7 @@ def generate_hardware_recommendations(
     )
 
     # =========================================================
-    # NOISE ANALYSIS
+    # NOISE
     # =========================================================
 
     noise_exposure_percent = _safe_float(
@@ -250,10 +259,12 @@ def generate_hardware_recommendations(
         0.0,
     )
 
-    noise_score = noise_exposure_percent / 100.0
     noise_score = max(
         0.0,
-        min(1.0, noise_score),
+        min(
+            1.0,
+            noise_exposure_percent / 100.0,
+        ),
     )
 
     # =========================================================
@@ -289,12 +300,6 @@ def generate_hardware_recommendations(
     )
 
     # =========================================================
-    # RECOMMENDATIONS
-    # =========================================================
-
-    recommendations: List[Dict[str, Any]] = []
-
-    # =========================================================
     # QUBIT CAPACITY
     # =========================================================
 
@@ -325,28 +330,16 @@ def generate_hardware_recommendations(
             "connectivity to reduce routing overhead."
         )
 
-    # If source code explicitly requires more qubits,
-    # distinguish circuit requirement from requested hardware size.
-
     if (
         isinstance(requested_minimum_qubits, int)
         and requested_minimum_qubits > qubits
     ):
         qubit_message = (
-            f"The circuit requires {qubits} qubits, but the "
-            f"submitted code explicitly requests a backend "
-            f"with at least {requested_minimum_qubits} qubits."
+            f"The circuit requires {qubits} qubits, while "
+            f"the submitted code explicitly requests a "
+            f"backend with at least "
+            f"{requested_minimum_qubits} qubits."
         )
-
-    recommendations.append(
-        {
-            "type": "qubit_capacity",
-            "priority": qubit_level,
-            "title": "Qubit Capacity",
-            "message": qubit_message,
-            "metric": qubits,
-        }
-    )
 
     # =========================================================
     # CIRCUIT DEPTH
@@ -376,16 +369,6 @@ def generate_hardware_recommendations(
             "gate fidelity and low decoherence exposure, and "
             "consider circuit optimization before execution."
         )
-
-    recommendations.append(
-        {
-            "type": "circuit_depth",
-            "priority": depth_level,
-            "title": "Circuit Depth",
-            "message": depth_message,
-            "metric": depth,
-        }
-    )
 
     # =========================================================
     # TWO-QUBIT CONNECTIVITY
@@ -417,19 +400,6 @@ def generate_hardware_recommendations(
             "especially important for this circuit."
         )
 
-    recommendations.append(
-        {
-            "type": "connectivity",
-            "priority": two_qubit_level,
-            "title": "Qubit Connectivity",
-            "message": two_qubit_message,
-            "metric": round(
-                two_qubit_ratio,
-                4,
-            ),
-        }
-    )
-
     # =========================================================
     # GATE DENSITY
     # =========================================================
@@ -458,19 +428,6 @@ def generate_hardware_recommendations(
             "High gate density. Consider optimization and "
             "hardware-aware transpilation before execution."
         )
-
-    recommendations.append(
-        {
-            "type": "gate_density",
-            "priority": density_level,
-            "title": "Gate Density",
-            "message": density_message,
-            "metric": round(
-                gate_density,
-                4,
-            ),
-        }
-    )
 
     # =========================================================
     # NOISE EXPOSURE
@@ -505,21 +462,8 @@ def generate_hardware_recommendations(
             "available circuit analysis."
         )
 
-    recommendations.append(
-        {
-            "type": "noise_exposure",
-            "priority": noise_level,
-            "title": "Noise Exposure",
-            "message": noise_message,
-            "metric": round(
-                noise_score,
-                4,
-            ),
-        }
-    )
-
     # =========================================================
-    # HARDWARE SYSTEM RECOMMENDATION
+    # HARDWARE SYSTEM
     # =========================================================
 
     if detected_provider == "IBM Quantum":
@@ -528,27 +472,30 @@ def generate_hardware_recommendations(
             "IBM Quantum-compatible superconducting QPU"
         )
 
+        hardware_system_reason = (
+            "IBM Quantum / Qiskit Runtime hardware was "
+            "detected in the submitted source. "
+        )
+
+        hardware_system_reason += (
+            f"The circuit requires {qubits} qubits."
+        )
+
         if requested_minimum_qubits:
-            hardware_system_reason = (
-                "IBM Quantum / Qiskit Runtime hardware was "
-                "detected in the submitted source. The circuit "
-                f"requires {qubits} qubits, while the code "
-                f"requests a backend with at least "
+            hardware_system_reason += (
+                f" The submitted code explicitly requests "
+                f"a backend with at least "
                 f"{requested_minimum_qubits} qubits."
             )
-        else:
-            hardware_system_reason = (
-                "IBM Quantum / Qiskit Runtime hardware was "
-                "detected in the submitted source. A compatible "
-                "IBM Quantum superconducting QPU should be "
-                "considered based on the circuit's qubit, "
-                "connectivity and gate-fidelity requirements."
+
+        if execution_target:
+            hardware_system_reason += (
+                f" Execution target: {execution_target}."
             )
 
         if backend_selection:
             hardware_system_reason += (
-                " The code also uses dynamic least-busy backend "
-                "selection."
+                f" Backend selection: {backend_selection}."
             )
 
     elif two_qubit_ratio > 0.50:
@@ -591,21 +538,6 @@ def generate_hardware_recommendations(
             "gate execution."
         )
 
-    recommendations.insert(
-        0,
-        {
-            "type": "hardware_system",
-            "priority": "high",
-            "title": "Recommended Hardware System",
-            "message": (
-                f"{hardware_system}. "
-                f"{hardware_system_reason}"
-            ),
-            "metric": qubits,
-            "hardware_system": hardware_system,
-        },
-    )
-
     # =========================================================
     # HARDWARE CHARACTERISTICS
     # =========================================================
@@ -629,12 +561,128 @@ def generate_hardware_recommendations(
         gate_fidelity_importance = "low"
 
     hardware_characteristics = {
-        "minimum_qubits": qubits,
-        "connectivity_importance": connectivity_importance,
-        "gate_fidelity_importance": gate_fidelity_importance,
+        "circuit_qubits": qubits,
+
+        "requested_minimum_qubits": (
+            requested_minimum_qubits
+        ),
+
+        "connectivity_importance": (
+            connectivity_importance
+        ),
+
+        "gate_fidelity_importance": (
+            gate_fidelity_importance
+        ),
+
         "noise_sensitivity": noise_level,
-        "recommended_hardware_system": hardware_system,
+
+        "recommended_hardware_system": (
+            hardware_system
+        ),
     }
+
+    # =========================================================
+    # RECOMMENDATION LIST
+    # =========================================================
+
+    recommendations: List[Dict[str, Any]] = []
+
+    recommendations.append(
+        {
+            "type": "hardware_system",
+            "priority": "high",
+            "title": "Recommended Hardware System",
+            "message": (
+                f"{hardware_system}. "
+                f"{hardware_system_reason}"
+            ),
+            "metric": qubits,
+            "hardware_system": hardware_system,
+        }
+    )
+
+    recommendations.append(
+        {
+            "type": "qubit_capacity",
+            "priority": qubit_level,
+            "title": "Circuit Qubit Requirement",
+            "message": qubit_message,
+            "metric": qubits,
+        }
+    )
+
+    if (
+        isinstance(
+            requested_minimum_qubits,
+            int,
+        )
+    ):
+        recommendations.append(
+            {
+                "type": "backend_qubit_requirement",
+                "priority": "moderate",
+                "title": "Requested Backend Size",
+                "message": (
+                    f"The submitted source explicitly "
+                    f"requests a backend with at least "
+                    f"{requested_minimum_qubits} qubits. "
+                    f"This is a source-code hardware "
+                    f"constraint, not the circuit's "
+                    f"intrinsic qubit requirement."
+                ),
+                "metric": requested_minimum_qubits,
+            }
+        )
+
+    recommendations.append(
+        {
+            "type": "circuit_depth",
+            "priority": depth_level,
+            "title": "Circuit Depth",
+            "message": depth_message,
+            "metric": depth,
+        }
+    )
+
+    recommendations.append(
+        {
+            "type": "connectivity",
+            "priority": two_qubit_level,
+            "title": "Qubit Connectivity",
+            "message": two_qubit_message,
+            "metric": round(
+                two_qubit_ratio,
+                4,
+            ),
+        }
+    )
+
+    recommendations.append(
+        {
+            "type": "gate_density",
+            "priority": density_level,
+            "title": "Gate Density",
+            "message": density_message,
+            "metric": round(
+                gate_density,
+                4,
+            ),
+        }
+    )
+
+    recommendations.append(
+        {
+            "type": "noise_exposure",
+            "priority": noise_level,
+            "title": "Noise Exposure",
+            "message": noise_message,
+            "metric": round(
+                noise_score,
+                4,
+            ),
+        }
+    )
 
     # =========================================================
     # EXECUTION RISK
@@ -701,7 +749,7 @@ def generate_hardware_recommendations(
         )
 
     # =========================================================
-    # SOURCE / HARDWARE DETECTION SUMMARY
+    # HARDWARE DETECTION SUMMARY
     # =========================================================
 
     hardware_detection = {
@@ -709,15 +757,27 @@ def generate_hardware_recommendations(
             "detected",
             False,
         ),
+
         "provider": detected_provider,
+
         "platform": detected_platform,
+
         "execution_target": execution_target,
+
         "backend_name": detected_backend,
-        "minimum_qubits": requested_minimum_qubits,
+
+        "circuit_qubits": qubits,
+
+        "requested_minimum_qubits": (
+            requested_minimum_qubits
+        ),
+
         "backend_selection": backend_selection,
+
         "simulator_requested": hardware_target.get(
             "simulator_requested"
         ),
+
         "constraints": hardware_target.get(
             "constraints",
             [],
@@ -739,9 +799,14 @@ def generate_hardware_recommendations(
 
         "recommended_hardware": {
             "system": hardware_system,
+
             "reason": hardware_system_reason,
 
-            "minimum_qubits": qubits,
+            "circuit_qubits": qubits,
+
+            "requested_minimum_qubits": (
+                requested_minimum_qubits
+            ),
 
             "connectivity_requirement": (
                 connectivity_importance
@@ -762,8 +827,11 @@ def generate_hardware_recommendations(
 
         "basis": {
             "qubits": qubits,
+
             "gate_count": gate_count,
+
             "depth": depth,
+
             "two_qubit_gates": two_qubit_gates,
 
             "two_qubit_ratio": round(
