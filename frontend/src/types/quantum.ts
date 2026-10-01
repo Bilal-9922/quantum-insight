@@ -73,15 +73,7 @@ export type Analysis = {
     score: number;
     category: string;
 
-    components?: {
-      depth_efficiency?: number;
-      gate_efficiency?: number;
-      qubit_utilization?: number;
-      two_qubit_efficiency?: number;
-      noise_exposure?: number;
-      optimization_potential?: number;
-      [key: string]: number | undefined;
-    };
+    components: Record<string, number>;
 
     weights?: Record<string, number>;
   };
