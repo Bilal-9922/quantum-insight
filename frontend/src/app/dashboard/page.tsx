@@ -9,7 +9,7 @@ type HistoryItem = {
   id: number;
   health_score: number;
   health_category: string;
-  qmi_score: number;
+  qmi_score: number | null;
   anomaly_score: number;
   created_at: string;
 };
@@ -203,13 +203,16 @@ export default function Dashboard() {
         ) / analyses
       : null;
 
+  const qmiScores = history
+    .map((item) => Number(item.qmi_score))
+    .filter((score) => Number.isFinite(score));
+
   const averageQMI =
-    analyses > 0
-      ? history.reduce(
-          (sum, item) =>
-            sum + Number(item.qmi_score || 0),
+    qmiScores.length > 0
+      ? qmiScores.reduce(
+          (sum, score) => sum + score,
           0
-        ) / analyses
+        ) / qmiScores.length
       : null;
 
   const averageAnomaly =
@@ -221,14 +224,14 @@ export default function Dashboard() {
         ) / analyses
       : null;
 
-  const latestQHI =
-    analyses > 0
-      ? Number(history[0].health_score || 0)
-      : null;
-
   const qhiProgress =
     averageQHI !== null
       ? Math.max(0, Math.min(100, averageQHI))
+      : 0;
+
+  const qmiProgress =
+    averageQMI !== null
+      ? Math.max(0, Math.min(100, averageQMI))
       : 0;
 
   return (
@@ -351,7 +354,7 @@ export default function Dashboard() {
           }
           note={
             averageQMI !== null
-              ? "Across saved analyses"
+              ? "Across analyzed circuits"
               : "Run an analysis to calculate"
           }
           icon="analyze"
@@ -386,68 +389,68 @@ export default function Dashboard() {
         />
       </section>
 
-      {/* Main dashboard grid */}
-      <section className="grid gap-5 xl:grid-cols-[1.6fr_.8fr]">
-        {/* Workflows */}
-        <div className="card p-6 sm:p-7">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="section-kicker">
-                Workflows
-              </p>
+      {/* Workflows */}
+      <section className="card p-6 sm:p-7">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="section-kicker">
+              Workflows
+            </p>
 
-              <h2 className="mt-1 text-xl font-bold text-white">
-                Choose your next move
-              </h2>
+            <h2 className="mt-1 text-xl font-bold text-white">
+              Choose your next move
+            </h2>
 
-              <p className="mt-1 text-xs text-slate-600">
-                Select a tool to continue working with your
-                quantum circuits.
-              </p>
-            </div>
-
-            <span className="badge shrink-0 text-slate-400">
-              3 tools
-            </span>
+            <p className="mt-1 text-xs text-slate-600">
+              Select a tool to continue working with your
+              quantum circuits.
+            </p>
           </div>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            {actions.map((action) => (
-              <Link
-                key={action.title}
-                href={action.href}
-                className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/[.018] p-5 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-400/15 hover:bg-cyan-400/[.025]"
-              >
-                <div className="absolute right-4 top-4 text-[10px] font-bold tracking-widest text-slate-700 transition group-hover:text-cyan-400/50">
-                  {action.number}
-                </div>
-
-                <div className="grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/10 bg-cyan-400/10 text-cyan-300 transition group-hover:border-cyan-400/20 group-hover:bg-cyan-400/15">
-                  <Icon
-                    name={action.icon}
-                    size={19}
-                  />
-                </div>
-
-                <h3 className="mt-5 font-bold text-white">
-                  {action.title}
-                </h3>
-
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  {action.description}
-                </p>
-
-                <div className="mt-5 flex items-center gap-2 text-xs font-bold text-cyan-300">
-                  Open workflow
-                  <span className="transition-transform group-hover:translate-x-1">
-                    <Icon name="arrow" size={13} />
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <span className="badge shrink-0 text-slate-400">
+            3 tools
+          </span>
         </div>
 
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          {actions.map((action) => (
+            <Link
+              key={action.title}
+              href={action.href}
+              className="group relative overflow-hidden rounded-2xl border border-white/5 bg-white/[.018] p-5 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-400/15 hover:bg-cyan-400/[.025]"
+            >
+              <div className="absolute right-4 top-4 text-[10px] font-bold tracking-widest text-slate-700 transition group-hover:text-cyan-400/50">
+                {action.number}
+              </div>
+
+              <div className="grid h-11 w-11 place-items-center rounded-xl border border-cyan-400/10 bg-cyan-400/10 text-cyan-300 transition group-hover:border-cyan-400/20 group-hover:bg-cyan-400/15">
+                <Icon
+                  name={action.icon}
+                  size={19}
+                />
+              </div>
+
+              <h3 className="mt-5 font-bold text-white">
+                {action.title}
+              </h3>
+
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                {action.description}
+              </p>
+
+              <div className="mt-5 flex items-center gap-2 text-xs font-bold text-cyan-300">
+                Open workflow
+                <span className="transition-transform group-hover:translate-x-1">
+                  <Icon name="arrow" size={13} />
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* QHI + QMI */}
+      <section className="grid gap-5 lg:grid-cols-2">
         {/* QHI */}
         <div className="card relative overflow-hidden p-6 sm:p-7">
           <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-cyan-400/5 blur-3xl" />
@@ -459,7 +462,7 @@ export default function Dashboard() {
                   Quantum Health Index
                 </p>
 
-                <h2 className="mt-1 text-xl font-bold">
+                <h2 className="mt-1 text-xl font-bold text-white">
                   Overall health
                 </h2>
               </div>
@@ -487,7 +490,7 @@ export default function Dashboard() {
 
                 <div className="relative grid h-36 w-36 place-items-center rounded-full border border-white/5 bg-slate-950">
                   <div className="text-center">
-                    <div className="text-4xl font-black tracking-tight">
+                    <div className="text-4xl font-black tracking-tight text-white">
                       {historyLoading
                         ? "…"
                         : averageQHI !== null
@@ -510,6 +513,73 @@ export default function Dashboard() {
                 {averageQHI !== null
                   ? "Based on your saved circuit analyses."
                   : "Analyze your first circuit to populate your QHI."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* QMI */}
+        <div className="card relative overflow-hidden p-6 sm:p-7">
+          <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-violet-400/5 blur-3xl" />
+
+          <div className="relative">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="section-kicker">
+                  Quantum Maintainability Index
+                </p>
+
+                <h2 className="mt-1 text-xl font-bold text-white">
+                  Circuit maintainability
+                </h2>
+              </div>
+
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-violet-400/5 text-violet-300">
+                <Icon name="analyze" size={16} />
+              </div>
+            </div>
+
+            <div className="mt-7 flex justify-center">
+              <div
+                className="relative grid h-44 w-44 place-items-center rounded-full"
+                style={{
+                  background:
+                    averageQMI !== null
+                      ? `conic-gradient(#a78bfa 0deg, #22d3ee ${
+                          qmiProgress * 3.6
+                        }deg, rgba(255,255,255,.07) ${
+                          qmiProgress * 3.6
+                        }deg)`
+                      : "conic-gradient(rgba(255,255,255,.07) 0deg, rgba(255,255,255,.07) 360deg)",
+                }}
+              >
+                <div className="absolute inset-[3px] rounded-full bg-slate-950/80" />
+
+                <div className="relative grid h-36 w-36 place-items-center rounded-full border border-white/5 bg-slate-950">
+                  <div className="text-center">
+                    <div className="text-4xl font-black tracking-tight text-white">
+                      {historyLoading
+                        ? "…"
+                        : averageQMI !== null
+                        ? averageQMI.toFixed(1)
+                        : "—"}
+                    </div>
+
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-600">
+                      {averageQMI !== null
+                        ? "Average QMI"
+                        : "No score yet"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-xl border border-white/5 bg-white/[.02] px-4 py-3 text-center">
+              <p className="text-xs leading-5 text-slate-500">
+                {averageQMI !== null
+                  ? "Based on analyses with QMI measurements."
+                  : "Analyze a circuit to populate your QMI."}
               </p>
             </div>
           </div>
