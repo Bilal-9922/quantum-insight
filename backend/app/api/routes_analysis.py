@@ -10,7 +10,6 @@ from app.circuit.parser import parse_qiskit_code
 from app.circuit.metrics import extract_metrics
 from app.circuit.visualization import circuit_data
 from app.circuit.validator import validate_python
-
 from app.health.scoring import calculate_qhi
 
 from app.ml.anomaly_detector import AnomalyDetector
@@ -20,6 +19,7 @@ from app.ai.recommender import recommend
 from app.ai.explainer import explain
 
 from app.noise.simulator import analyze_noise
+from app.hardware.recommendations import generate_hardware_recommendations
 
 
 router = APIRouter(tags=["analysis"])
@@ -57,6 +57,11 @@ def analyze(
         anomaly = detector.predict(metrics)
         noise = analyze_noise(metrics)
 
+        hardware_recommendations = generate_hardware_recommendations(
+            metrics=metrics,
+            noise=noise,
+        )
+
         analysis = {
             "success": True,
             "validation": validation,
@@ -67,6 +72,7 @@ def analyze(
             "model_health": model_health,
             "anomaly": anomaly,
             "noise": noise,
+            "hardware_recommendations": hardware_recommendations,
         }
 
         analysis["recommendations"] = recommend(analysis)
