@@ -9,6 +9,7 @@ type HistoryItem = {
   id: number;
   health_score: number;
   health_category: string;
+  qmi_score: number;
   anomaly_score: number;
   created_at: string;
 };
