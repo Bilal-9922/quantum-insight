@@ -111,21 +111,6 @@ export default function CircuitViewer({
     );
   }
 
-  function getGateClasses(gate: {
-    name: string;
-    qubits: number[];
-  }) {
-    if (isMeasurement(gate.name)) {
-      return "border-emerald-300/50 bg-emerald-400/10 text-emerald-300";
-    }
-
-    if (isMultiQubit(gate)) {
-      return "border-violet-300/50 bg-violet-400/10 text-violet-200";
-    }
-
-    return "border-cyan-300/50 bg-cyan-400/10 text-cyan-300";
-  }
-
   return (
     <div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
 
@@ -156,170 +141,101 @@ export default function CircuitViewer({
           </div>
         </div>
 
-        {/* Horizontal operation flow */}
-        <div className="overflow-x-auto p-5">
-          <div
-            className="min-w-max rounded-2xl border border-white/5 bg-slate-950/70 p-5"
-            style={{
-              minWidth: `${Math.max(
-                540,
-                110 + normalizedGates.length * 85
-              )}px`,
-            }}
-          >
+        {/* ================================================= */}
+        {/* COMPACT OPERATION FLOW                            */}
+        {/* ================================================= */}
 
-            {/* Step numbers */}
-            <div className="mb-3 flex">
-              <div className="w-16 shrink-0" />
+        <div className="p-5">
+          <div className="overflow-x-auto rounded-2xl border border-white/5 bg-slate-950/70">
+            <div className="min-w-max p-5">
 
-              {normalizedGates.map((gate, index) => (
-                <div
-                  key={`${gate.id}-operation-step`}
-                  className="w-[85px] shrink-0 text-center"
-                >
-                  <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-600">
-                    Step {index + 1}
-                  </span>
-                </div>
-              ))}
-            </div>
+              <div className="space-y-3">
 
-            {/* Qubit rows */}
-            <div className="relative">
-
-              {Array.from(
-                { length: qubitCount },
-                (_, qubit) => (
-                  <div
-                    key={`operation-row-${qubit}`}
-                    className="relative flex h-16 items-center"
-                  >
-
-                    {/* Qubit label */}
-                    <div className="w-16 shrink-0">
-                      <span className="font-mono text-sm font-semibold text-slate-300">
-                        q[{qubit}]
-                      </span>
-                    </div>
-
-                    {/* Horizontal wire */}
-                    <div className="relative flex flex-1 items-center">
-                      <div className="absolute left-0 right-0 top-1/2 h-px bg-slate-700" />
-
-                      {normalizedGates.map(
-                        (gate) => {
-                          const active =
-                            gate.qubits.includes(qubit);
-
-                          return (
-                            <div
-                              key={`${gate.id}-operation-${qubit}`}
-                              className="relative flex h-16 w-[85px] shrink-0 items-center justify-center"
-                            >
-                              {active ? (
-                                <div
-                                  className={`relative z-10 grid min-h-9 min-w-11 place-items-center rounded-lg border px-2 text-[10px] font-black tracking-wide ${getGateClasses(
-                                    gate
-                                  )}`}
-                                >
-                                  {isMeasurement(
-                                    gate.name
-                                  )
-                                    ? "M"
-                                    : getLabel(
-                                        gate.name
-                                      )}
-                                </div>
-                              ) : (
-                                <span className="relative z-10 text-[9px] text-slate-800">
-                                  ·
-                                </span>
-                              )}
-                            </div>
-                          );
-                        }
-                      )}
-                    </div>
-                  </div>
-                )
-              )}
-
-              {/* Multi-qubit connection lines */}
-              {normalizedGates.map(
-                (gate, gateIndex) => {
-                  if (
-                    !isMultiQubit(gate) ||
-                    gate.qubits.length < 2
-                  ) {
-                    return null;
-                  }
-
-                  const minQubit = Math.min(
-                    ...gate.qubits
-                  );
-
-                  const maxQubit = Math.max(
-                    ...gate.qubits
-                  );
-
-                  const top =
-                    32 + minQubit * 64;
-
-                  const height =
-                    (maxQubit - minQubit) * 64;
-
-                  const left =
-                    16 +
-                    85 * gateIndex +
-                    42.5;
-
-                  return (
+                {Array.from(
+                  { length: qubitCount },
+                  (_, qubit) => (
                     <div
-                      key={`${gate.id}-operation-line`}
-                      className="pointer-events-none absolute w-px bg-violet-300/70"
-                      style={{
-                        left: `${left}px`,
-                        top: `${top}px`,
-                        height: `${height}px`,
-                      }}
+                      key={`operation-row-${qubit}`}
+                      className="flex items-center"
                     >
-                      {isCX(gate.name) && (
-                        <>
-                          <span className="absolute left-1/2 top-0 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-300 shadow-[0_0_12px_rgba(167,139,250,.6)]" />
 
-                          <span className="absolute bottom-0 left-1/2 grid h-7 w-7 -translate-x-1/2 translate-y-1/2 place-items-center rounded-full border border-violet-300/80 bg-slate-950 text-sm font-black text-violet-200">
-                            +
-                          </span>
-                        </>
-                      )}
+                      {/* Qubit label */}
+                      <div className="w-14 shrink-0">
+                        <span className="font-mono text-sm font-semibold text-slate-300">
+                          q[{qubit}]
+                        </span>
+                      </div>
+
+                      {/* Operations */}
+                      <div className="flex items-center">
+                        {normalizedGates.map(
+                          (gate) => {
+                            const active =
+                              gate.qubits.includes(
+                                qubit
+                              );
+
+                            return (
+                              <div
+                                key={`${gate.id}-${qubit}`}
+                                className="flex h-10 w-[68px] shrink-0 items-center justify-center"
+                              >
+                                {active ? (
+                                  <span
+                                    className={`inline-flex min-w-9 items-center justify-center rounded-md border px-2 py-1.5 text-[10px] font-black uppercase tracking-wide ${
+                                      isMeasurement(
+                                        gate.name
+                                      )
+                                        ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
+                                        : isMultiQubit(
+                                            gate
+                                          )
+                                        ? "border-violet-400/40 bg-violet-400/10 text-violet-300"
+                                        : "border-cyan-400/40 bg-cyan-400/10 text-cyan-300"
+                                    }`}
+                                  >
+                                    {isMeasurement(
+                                      gate.name
+                                    )
+                                      ? "M"
+                                      : getLabel(
+                                          gate.name
+                                        )}
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] text-slate-800">
+                                    ·
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                        )}
+                      </div>
                     </div>
-                  );
-                }
-              )}
-            </div>
+                  )
+                )}
 
-            {/* Operation names */}
-            <div className="mt-4 flex">
-              <div className="w-16 shrink-0" />
+              </div>
 
-              {normalizedGates.map(
-                (gate) => (
-                  <div
-                    key={`${gate.id}-operation-label`}
-                    className="w-[85px] shrink-0 text-center"
-                  >
-                    <span className="block truncate text-[9px] font-semibold text-slate-400">
-                      {gate.name}
-                    </span>
+              {/* Operation names */}
+              <div className="mt-4 flex">
+                <div className="w-14 shrink-0" />
 
-                    {gate.qubits.length > 1 && (
-                      <span className="mt-1 block text-[8px] font-semibold text-violet-400/80">
-                        {gate.qubits.length}Q
+                {normalizedGates.map(
+                  (gate) => (
+                    <div
+                      key={`${gate.id}-label`}
+                      className="w-[68px] shrink-0 text-center"
+                    >
+                      <span className="block truncate text-[8px] font-semibold text-slate-500">
+                        {gate.name}
                       </span>
-                    )}
-                  </div>
-                )
-              )}
+                    </div>
+                  )
+                )}
+              </div>
+
             </div>
           </div>
         </div>
@@ -481,9 +397,17 @@ export default function CircuitViewer({
                             >
                               {active ? (
                                 <div
-                                  className={`relative z-10 grid min-h-9 min-w-11 place-items-center rounded-lg border px-2 text-[10px] font-black tracking-wide ${getGateClasses(
-                                    gate
-                                  )}`}
+                                  className={`relative z-10 grid min-h-9 min-w-11 place-items-center rounded-lg border px-2 text-[10px] font-black tracking-wide ${
+                                    isMeasurement(
+                                      gate.name
+                                    )
+                                      ? "border-emerald-300/50 bg-emerald-400/10 text-emerald-300"
+                                      : isMultiQubit(
+                                          gate
+                                        )
+                                      ? "border-violet-300/50 bg-violet-400/10 text-violet-200"
+                                      : "border-cyan-300/50 bg-cyan-400/10 text-cyan-300"
+                                  }`}
                                 >
                                   {isMeasurement(
                                     gate.name
@@ -572,12 +496,12 @@ export default function CircuitViewer({
                     key={`${gate.id}-label`}
                     className="w-[85px] shrink-0 text-center"
                   >
-                    <span className="block truncate text-[9px] font-semibold text-slate-400">
+                    <span className="block truncate text-[9px] text-slate-600">
                       {gate.name}
                     </span>
 
                     {gate.qubits.length > 1 && (
-                      <span className="mt-1 block text-[8px] font-semibold text-violet-400/80">
+                      <span className="mt-1 block text-[8px] font-semibold text-violet-400/70">
                         {gate.qubits.length}Q
                       </span>
                     )}
@@ -609,4 +533,3 @@ export default function CircuitViewer({
     </div>
   );
 }
-
