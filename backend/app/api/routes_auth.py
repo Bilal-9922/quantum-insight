@@ -7,12 +7,14 @@ from pydantic import BaseModel, Field
 
 from app.auth import (
     authenticate,
+    change_password,
     create_password_reset_token,
     create_token,
     current_user,
     init_auth_db,
     register_user,
     reset_password,
+    update_user_name,
 )
 from app.core.supabase import supabase
 
@@ -44,6 +46,21 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     password: str = Field(min_length=8, max_length=128)
+
+
+class ChangeNameRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(
+        min_length=1,
+        max_length=128,
+    )
+    new_password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
 
 
 @router.post("/auth/register")
@@ -174,6 +191,40 @@ def google_login(req: GoogleLoginRequest):
     }
 
 
+@router.put("/auth/profile/name")
+def change_name(
+    req: ChangeNameRequest,
+    user=Depends(current_user),
+):
+    updated_user = update_user_name(
+        user["id"],
+        req.name,
+    )
+
+    return {
+        "success": True,
+        "message": "Name updated successfully.",
+        "user": updated_user,
+    }
+
+
+@router.put("/auth/profile/password")
+def change_user_password(
+    req: ChangePasswordRequest,
+    user=Depends(current_user),
+):
+    change_password(
+        user["id"],
+        req.current_password,
+        req.new_password,
+    )
+
+    return {
+        "success": True,
+        "message": "Password changed successfully.",
+    }
+
+
 @router.post("/auth/forgot-password")
 def forgot_password(req: ForgotPasswordRequest):
     email = req.email.strip().lower()
@@ -273,8 +324,6 @@ def forgot_password(req: ForgotPasswordRequest):
         )
 
     except Exception:
-        # Do not expose third-party email-service errors
-        # or internal implementation details to the client.
         raise HTTPException(
             status_code=500,
             detail="Unable to send password reset email.",
