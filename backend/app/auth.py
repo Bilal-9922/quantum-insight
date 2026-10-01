@@ -13,7 +13,9 @@ from app.core.supabase import supabase
 JWT_SECRET = os.getenv("JWT_SECRET")
 
 if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET environment variable is not configured.")
+    raise RuntimeError(
+        "JWT_SECRET environment variable is not configured."
+    )
 
 JWT_ALGORITHM = "HS256"
 TOKEN_DAYS = 7
@@ -120,6 +122,16 @@ def authenticate(
 
     row = response.data[0]
 
+    # Google-created accounts do not have a local password.
+    if not row.get("password_hash") or not row.get("salt"):
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "This account uses Google Sign-In. "
+                "Please continue with Google."
+            ),
+        )
+
     candidate, _ = _hash_password(
         password,
         row["salt"],
@@ -135,6 +147,170 @@ def authenticate(
         )
 
     return _user(row)
+
+
+def update_user_name(
+    user_id: int,
+    new_name: str,
+):
+    new_name = new_name.strip()
+
+    if len(new_name) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail="Name must contain at least 2 characters.",
+        )
+
+    if len(new_name) > 80:
+        raise HTTPException(
+            status_code=422,
+            detail="Name must not exceed 80 characters.",
+        )
+
+    try:
+        response = (
+            supabase
+            .table("users")
+            .update(
+                {
+                    "name": new_name,
+                }
+            )
+            .eq("id", user_id)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to update your name.",
+        )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to update your name.",
+        )
+
+    return _user(response.data[0])
+
+
+def change_password(
+    user_id: int,
+    current_password: str,
+    new_password: str,
+):
+    if len(new_password) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="New password must contain at least 8 characters.",
+        )
+
+    if len(new_password) > 128:
+        raise HTTPException(
+            status_code=422,
+            detail="New password must not exceed 128 characters.",
+        )
+
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be different from your current password.",
+        )
+
+    try:
+        response = (
+            supabase
+            .table("users")
+            .select("*")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to verify your account.",
+        )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail="User account not found.",
+        )
+
+    row = response.data[0]
+
+    # Google-created accounts do not have a local password.
+    if not row.get("password_hash") or not row.get("salt"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This account uses Google Sign-In and does not "
+                "have a password to change."
+            ),
+        )
+
+    current_hash, _ = _hash_password(
+        current_password,
+        row["salt"],
+    )
+
+    if not hmac.compare_digest(
+        current_hash,
+        row["password_hash"],
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Current password is incorrect.",
+        )
+
+    new_hash, new_salt = _hash_password(
+        new_password
+    )
+
+    try:
+        update_response = (
+            supabase
+            .table("users")
+            .update(
+                {
+                    "password_hash": new_hash,
+                    "salt": new_salt,
+                }
+            )
+            .eq("id", user_id)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to change password.",
+        )
+
+    if not update_response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to change password.",
+        )
+
+    # Invalidate any outstanding password-reset links
+    # after a successful password change.
+    try:
+        (
+            supabase
+            .table("password_resets")
+            .update({"used": True})
+            .eq("user_id", user_id)
+            .eq("used", False)
+            .execute()
+        )
+    except Exception:
+        pass
+
+    return True
 
 
 def create_token(user):
@@ -154,7 +330,6 @@ def create_token(user):
 
 
 def create_password_reset_token(user_id: int):
-
     raw_token = secrets.token_urlsafe(32)
 
     token_hash = hashlib.sha256(
@@ -167,13 +342,15 @@ def create_password_reset_token(user_id: int):
         minutes=RESET_TOKEN_MINUTES
     )
 
-    # Disable previous unused reset tokens
-    supabase \
-        .table("password_resets") \
-        .update({"used": True}) \
-        .eq("user_id", user_id) \
-        .eq("used", False) \
+    # Disable previous unused reset tokens.
+    (
+        supabase
+        .table("password_resets")
+        .update({"used": True})
+        .eq("user_id", user_id)
+        .eq("used", False)
         .execute()
+    )
 
     response = (
         supabase
