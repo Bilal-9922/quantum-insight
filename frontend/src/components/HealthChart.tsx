@@ -105,8 +105,8 @@ export default function HealthChart({
               color: "#67e8f9",
               fontSize: 10,
             }}
-            formatter={(value: number | undefined) => [
-              `${Number(value ?? 0).toFixed(1)}`,
+            formatter={(value) => [
+              `${Number(value).toFixed(1)}`,
               "Score",
             ]}
           />
