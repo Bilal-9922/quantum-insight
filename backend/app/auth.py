@@ -934,3 +934,24 @@ def delete_user_account(
         )
 
     return True
+
+def admin_user(
+    authorization: str | None = Header(default=None),
+):
+    user = current_user(authorization)
+
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+
+    if not admin_email:
+        raise HTTPException(
+            status_code=500,
+            detail="Admin account is not configured.",
+        )
+
+    if user["email"].strip().lower() != admin_email:
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator access required.",
+        )
+
+    return user
