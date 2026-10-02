@@ -57,19 +57,7 @@ def contains_qiskit_circuit_code(code: str) -> bool:
     # ---------------------------------------------------------
     # 2. Real Qiskit QuantumCircuit constructor
     # ---------------------------------------------------------
-    #
-    # Match:
-    #
-    # QuantumCircuit(...)
-    #
-    # qiskit.QuantumCircuit(...)
-    #
-    # But DO NOT match:
-    #
-    # PseudoQuantumCircuit(...)
-    # MyQuantumCircuit(...)
-    # FakeQuantumCircuit(...)
-    #
+
     constructor_patterns = [
         r"(?<![A-Za-z0-9_])QuantumCircuit\s*\(",
         r"\bqiskit\.QuantumCircuit\s*\(",
@@ -91,19 +79,6 @@ def debug(
     # ---------------------------------------------------------
     # 1. Reject clearly non-Qiskit / pseudo quantum code
     # ---------------------------------------------------------
-    #
-    # We intentionally DO NOT call parse_qiskit_code() here.
-    #
-    # The Debugger must be able to receive malformed Qiskit
-    # code such as:
-    #
-    #     qc.h(0
-    #
-    # and diagnose it as a syntax error.
-    #
-    # Therefore, this first stage only determines whether the
-    # submitted code appears to contain real Qiskit code.
-    # ---------------------------------------------------------
 
     if not contains_qiskit_circuit_code(req.code):
 
@@ -124,12 +99,6 @@ def debug(
     # ---------------------------------------------------------
     # 2. Analyze the submitted source
     # ---------------------------------------------------------
-    #
-    # analyze_ast() can detect Python syntax problems.
-    #
-    # This information is preserved even if the code contains
-    # a syntax error.
-    # ---------------------------------------------------------
 
     try:
         ast_result = analyze_ast(req.code)
@@ -143,22 +112,12 @@ def debug(
     # ---------------------------------------------------------
     # 3. Run Qiskit validation / debugging checks
     # ---------------------------------------------------------
-    #
-    # This stage detects:
-    #
-    # - Syntax errors
-    # - Qubit index errors
-    # - Classical bit errors
-    # - Gate argument errors
-    # - Undefined variables
-    # - Unsupported gates
-    # - Parameter problems
-    # - Other Qiskit-related errors
-    # ---------------------------------------------------------
 
-    rdetected_error = runner_result.get("error")
+    runner_result = run_qiskit_check(req.code)
+
+    detected_error = runner_result.get("error")
     runner_success = runner_result.get("success") is True
-    
+
     # ---------------------------------------------------------
     # The Qiskit runner is the authoritative validation layer.
     #
@@ -167,7 +126,6 @@ def debug(
     # turn a valid circuit into GENERAL_ERROR.
     # ---------------------------------------------------------
 
-
     # ---------------------------------------------------------
     # 4. Determine the error type
     # ---------------------------------------------------------
@@ -175,12 +133,12 @@ def debug(
     if runner_success and not detected_error:
         error_message = None
         error_type = "NO_ERROR"
-    
+
     else:
         error_message = detected_error or req.error
-    
+
         error_type = runner_result.get("error_type")
-    
+
         if not error_type:
             error_type = classify(error_message)
 
