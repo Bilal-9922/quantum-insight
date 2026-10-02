@@ -26,24 +26,23 @@ export default function Debugger() {
 
   async function run() {
     setBusy(true);
+    setRes(undefined);
 
     try {
       const result = await debug(code, err);
       setRes(result);
     } catch (error: any) {
       setRes({
+        success: false,
         error: {
           type: "GENERAL_ERROR",
+          message:
+            error?.message ||
+            "Unable to communicate with the debugger service.",
         },
-        diagnosis:
+        message:
           error?.message ||
           "Unable to communicate with the debugger service.",
-        suggestions: [
-          "Check that the backend service is running.",
-          "Verify the API connection.",
-          "Try again after the backend becomes available.",
-        ],
-        verified: false,
       });
     } finally {
       setBusy(false);
@@ -65,6 +64,25 @@ export default function Debugger() {
       </div>
     );
   }
+
+  /*
+   * ---------------------------------------------------------
+   * Unsupported / invalid code response
+   * ---------------------------------------------------------
+   *
+   * The backend returns success:false when the submitted
+   * source is not recognizable Qiskit quantum code.
+   *
+   * Do NOT send this result to DebugPanel because DebugPanel
+   * expects a normal debugger result.
+   */
+  const isUnsupportedCode =
+    res?.success === false &&
+    res?.error?.type === "UNSUPPORTED_QUANTUM_CODE";
+
+  const isGeneralError =
+    res?.success === false &&
+    res?.error?.type !== "UNSUPPORTED_QUANTUM_CODE";
 
   return (
     <div className="space-y-7">
@@ -279,10 +297,93 @@ export default function Debugger() {
             </span>
           </div>
 
-          <DebugPanel
-            result={res}
-            onApplyFix={applySuggestedFix}
-          />
+          {/* Unsupported Qiskit code */}
+          {isUnsupportedCode && (
+            <div className="overflow-hidden rounded-2xl border border-amber-400/20 bg-amber-400/[.04]">
+              <div className="border-b border-amber-400/10 bg-amber-400/[.05] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-400/10 text-amber-300">
+                    <Icon name="bug" size={17} />
+                  </span>
+
+                  <div>
+                    <p className="text-sm font-bold text-amber-200">
+                      Unsupported Quantum Code
+                    </p>
+
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-amber-300/50">
+                      Detection stopped
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5">
+                <p className="text-sm leading-6 text-slate-300">
+                  {res.error?.message ||
+                    res.message ||
+                    "The submitted source is not recognized as a valid Qiskit quantum circuit."}
+                </p>
+
+                <div className="mt-4 rounded-xl border border-white/5 bg-black/20 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                    Supported input
+                  </p>
+
+                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                    AI Quantum Debugger accepts real Qiskit
+                    quantum circuit code only. Normal Python,
+                    pseudo quantum code, Java, C++, and other
+                    non-Qiskit source code cannot be analyzed.
+                  </p>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 text-xs text-amber-300/70">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+                  No debugging or patch generation was performed.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* General backend/service error */}
+          {isGeneralError && (
+            <div className="overflow-hidden rounded-2xl border border-rose-400/20 bg-rose-400/[.04]">
+              <div className="border-b border-rose-400/10 bg-rose-400/[.05] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
+                    <Icon name="bug" size={17} />
+                  </span>
+
+                  <div>
+                    <p className="text-sm font-bold text-rose-200">
+                      Debugging failed
+                    </p>
+
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-rose-300/50">
+                      Service error
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5">
+                <p className="text-sm leading-6 text-slate-300">
+                  {res.error?.message ||
+                    res.message ||
+                    "Unable to process the submitted code."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Normal successful debugger result */}
+          {res?.success !== false && (
+            <DebugPanel
+              result={res}
+              onApplyFix={applySuggestedFix}
+            />
+          )}
         </section>
       )}
 
