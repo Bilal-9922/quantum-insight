@@ -6,146 +6,44 @@ import DebugPanel from "../../components/DebugPanel";
 import { Icon } from "../../components/Icons";
 import { useRequireAuth } from "../../lib/auth";
 
-type TestSample = {
-  name: string;
-  description: string;
-  code: string;
-  error: string;
-};
-
-const TEST_SAMPLES: TestSample[] = [
-  {
-    name: "Valid Qiskit Code",
-    description: "Valid Qiskit circuit with no reported error.",
-    code: `from qiskit import QuantumCircuit
+const SAMPLE_CODE = `from qiskit import QuantumCircuit
 
 qc = QuantumCircuit(2)
-qc.h(0)
-qc.cx(0, 1)`,
-    error: "",
-  },
-  {
-    name: "Syntax Error",
-    description: "Missing closing parenthesis.",
-    code: `from qiskit import QuantumCircuit
-
-qc = QuantumCircuit(2)
-qc.h(0
-qc.cx(0, 1)`,
-    error: "SyntaxError: '(' was never closed",
-  },
-  {
-    name: "Qubit Index Error",
-    description: "Qubit index is outside the circuit size.",
-    code: `from qiskit import QuantumCircuit
-
-qc = QuantumCircuit(2)
-qc.h(0)
-qc.cx(0, 1)
-qc.x(3)`,
-    error: "Index 3 out of range for size 2",
-  },
-  {
-    name: "Gate Argument Error",
-    description: "The CX gate is missing its second qubit.",
-    code: `from qiskit import QuantumCircuit
-
-qc = QuantumCircuit(2)
-qc.cx(0)`,
-    error:
-      "The cx gate requires 2 qubit arguments, but only 1 was provided.",
-  },
-  {
-    name: "Classical Bit Error",
-    description: "Measurement uses an invalid classical bit.",
-    code: `from qiskit import QuantumCircuit
-
-qc = QuantumCircuit(2, 1)
-qc.h(0)
-qc.measure(1, 1)`,
-    error:
-      "Classical bit index 1 is out of range for a circuit with 1 classical bit.",
-  },
-  {
-    name: "Name Error",
-    description: "The circuit references an undefined variable.",
-    code: `from qiskit import QuantumCircuit
-
-qc = QuantumCircuit(2)
-qc.h(0)
-qc.cx(0, 1)
-qc.x(qubit)`,
-    error: "NameError: name 'qubit' is not defined",
-  },
-  {
-    name: "Unsupported / Fake Code",
-    description: "Pseudo quantum code that is not a real Qiskit circuit.",
-    code: `class QuantumRegister:
-    def __init__(self, size):
-        self.size = size
-        self.states = [0.0] * size
-
-
-class PseudoQuantumCircuit:
-    def __init__(self, qreg):
-        self.qreg = qreg
-        self.operations = []
-
-    def h(self, qubit):
-        self.operations.append(("H", qubit))
-
-    def cx(self, control, target):
-        self.operations.append(("CX", control, target))
-
-
-qr = QuantumRegister(2)
-
-qc = PseudoQuantumCircuit(qr)
 
 qc.h(0)
-qc.cx(0, 1)`,
-    error: "This code is not a real Qiskit QuantumCircuit.",
-  },
-];
+qc.cx(0)
 
-const DEFAULT_SAMPLE = TEST_SAMPLES[0];
+print(qc)`;
+
+const SAMPLE_ERROR =
+  "The cx gate requires 2 qubit arguments, but only 1 was provided.";
 
 export default function Debugger() {
   const { loading } = useRequireAuth();
 
-  const [code, setCode] = useState(DEFAULT_SAMPLE.code);
-  const [err, setErr] = useState(DEFAULT_SAMPLE.error);
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState("");
   const [res, setRes] = useState<any>(undefined);
   const [busy, setBusy] = useState(false);
-  const [selectedSample, setSelectedSample] = useState(
-    DEFAULT_SAMPLE.name
-  );
+  const [sampleLoaded, setSampleLoaded] = useState(false);
 
-  function loadSample(sampleName: string) {
-    const sample = TEST_SAMPLES.find(
-      (item) => item.name === sampleName
-    );
-
-    if (!sample) {
-      return;
-    }
-
-    setSelectedSample(sample.name);
-    setCode(sample.code);
-    setErr(sample.error);
+  function loadSample() {
+    setCode(SAMPLE_CODE);
+    setErr(SAMPLE_ERROR);
+    setSampleLoaded(true);
     setRes(undefined);
   }
 
   function handleCodeChange(value: string) {
     setCode(value);
     setRes(undefined);
-    setSelectedSample("Custom Code");
+    setSampleLoaded(false);
   }
 
   function handleErrorChange(value: string) {
     setErr(value);
     setRes(undefined);
-    setSelectedSample("Custom Code");
+    setSampleLoaded(false);
   }
 
   async function run() {
@@ -188,10 +86,6 @@ export default function Debugger() {
   const isGeneralError =
     res?.success === false &&
     res?.error?.type !== "UNSUPPORTED_QUANTUM_CODE";
-
-  const selectedSampleData = TEST_SAMPLES.find(
-    (item) => item.name === selectedSample
-  );
 
   return (
     <div className="space-y-7">
@@ -238,7 +132,7 @@ export default function Debugger() {
         </div>
       </section>
 
-      {/* Test Samples */}
+      {/* Test Sample */}
       <section className="card overflow-hidden">
         <div className="border-b border-white/5 px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -249,77 +143,53 @@ export default function Debugger() {
                 </span>
 
                 <p className="text-sm font-bold text-slate-200">
-                  Test samples
+                  Test Sample
                 </p>
               </div>
 
               <p className="mt-1 text-[11px] text-slate-600">
-                Choose a built-in debugger test case.
+                Load a built-in Qiskit debugging example.
               </p>
             </div>
 
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
-              {TEST_SAMPLES.length} test cases
+              Qiskit Example
             </span>
           </div>
         </div>
 
         <div className="p-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <select
-              value={selectedSample}
-              onChange={(event) =>
-                loadSample(event.target.value)
-              }
-              className="w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm font-medium text-slate-200 outline-none transition focus:border-cyan-400/40 sm:flex-1"
-            >
-              {selectedSample === "Custom Code" && (
-                <option value="Custom Code">
-                  Custom Code
-                </option>
-              )}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-slate-300">
+                Gate Argument Error
+              </p>
 
-              {TEST_SAMPLES.map((sample) => (
-                <option
-                  key={sample.name}
-                  value={sample.name}
-                >
-                  {sample.name}
-                </option>
-              ))}
-            </select>
+              <p className="mt-1 text-[11px] leading-5 text-slate-600">
+                A real Qiskit circuit where the CX gate is missing
+                its second qubit argument.
+              </p>
+            </div>
 
             <button
               type="button"
-              onClick={() => loadSample(selectedSample)}
-              disabled={selectedSample === "Custom Code"}
-              className="btn btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={loadSample}
+              className="btn btn-secondary justify-center"
             >
               <Icon name="refresh" size={14} />
               Load Sample
             </button>
           </div>
 
-          {selectedSampleData && (
-            <div className="mt-3 rounded-xl border border-white/5 bg-black/10 px-4 py-3">
-              <p className="text-xs font-semibold text-slate-300">
-                {selectedSampleData.name}
-              </p>
-
-              <p className="mt-1 text-[11px] leading-5 text-slate-600">
-                {selectedSampleData.description}
-              </p>
-            </div>
-          )}
-
-          {selectedSample === "Custom Code" && (
+          {sampleLoaded && (
             <div className="mt-3 rounded-xl border border-cyan-400/10 bg-cyan-400/[.03] px-4 py-3">
               <p className="text-xs font-semibold text-cyan-300">
-                Custom Code
+                Sample Loaded
               </p>
 
               <p className="mt-1 text-[11px] leading-5 text-slate-600">
-                You are editing the code manually.
+                The Qiskit gate argument error has been loaded into
+                the debugger.
               </p>
             </div>
           )}
@@ -533,7 +403,7 @@ export default function Debugger() {
             onApplyFix={(fixedCode) => {
               setCode(fixedCode);
               setRes(undefined);
-              setSelectedSample("Custom Code");
+              setSampleLoaded(false);
             }}
           />
         </section>
@@ -551,9 +421,9 @@ export default function Debugger() {
           </p>
 
           <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-700">
-            Select a test sample or submit your own Qiskit circuit
-            and error message to identify, diagnose and verify
-            quantum programming issues.
+            Load the built-in Qiskit sample or submit your own
+            Qiskit circuit and error message to identify, diagnose
+            and verify quantum programming issues.
           </p>
         </div>
       )}
