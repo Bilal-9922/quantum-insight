@@ -1,7 +1,7 @@
 import os
 import re
 
-import resend
+import requests
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -62,6 +62,7 @@ class ChangePasswordRequest(BaseModel):
         min_length=8,
         max_length=128,
     )
+
 
 class DeleteAccountRequest(BaseModel):
     password: str = Field(
@@ -231,6 +232,7 @@ def change_user_password(
         "message": "Password changed successfully.",
     }
 
+
 @router.delete("/auth/account")
 def delete_account(
     req: DeleteAccountRequest,
@@ -243,7 +245,9 @@ def delete_account(
 
     return {
         "success": True,
-        "message": "Your QuantumInsight account has been permanently deleted.",
+        "message": (
+            "Your QuantumInsight account has been permanently deleted."
+        ),
     }
 
 
@@ -286,64 +290,90 @@ def forgot_password(req: ForgotPasswordRequest):
         f"{frontend_url}/reset-password?token={token}"
     )
 
-    resend.api_key = os.getenv(
-        "RESEND_API_KEY"
-    )
+    brevo_api_key = os.getenv("BREVO_API_KEY")
 
-    if not resend.api_key:
+    if not brevo_api_key:
         raise HTTPException(
             status_code=500,
             detail="Email service is not configured.",
         )
 
-    try:
-        resend.Emails.send(
+    email_payload = {
+        "sender": {
+            "name": "QuantumInsight",
+            "email": "onboarding@resend.dev",
+        },
+        "to": [
             {
-                "from": "QuantumInsight <onboarding@resend.dev>",
-                "to": [user["email"]],
-                "subject": "Reset your QuantumInsight password",
-                "html": f"""
-                <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
-                    <h2>Reset your QuantumInsight password</h2>
-
-                    <p>Hello {user["name"]},</p>
-
-                    <p>
-                        We received a request to reset your
-                        QuantumInsight password.
-                    </p>
-
-                    <p>
-                        <a
-                            href="{reset_url}"
-                            style="
-                                display:inline-block;
-                                padding:12px 20px;
-                                background:#2563eb;
-                                color:white;
-                                text-decoration:none;
-                                border-radius:8px;
-                            "
-                        >
-                            Reset Password
-                        </a>
-                    </p>
-
-                    <p>
-                        This link expires in 30 minutes and can
-                        only be used once.
-                    </p>
-
-                    <p>
-                        If you did not request this, you can
-                        safely ignore this email.
-                    </p>
-
-                    <p>— QuantumInsight</p>
-                </div>
-                """,
+                "email": user["email"],
+                "name": user["name"],
             }
+        ],
+        "subject": "Reset your QuantumInsight password",
+        "htmlContent": f"""
+        <div style="
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            color: #1e293b;
+        ">
+            <h2>Reset your QuantumInsight password</h2>
+
+            <p>Hello {user["name"]},</p>
+
+            <p>
+                We received a request to reset your
+                QuantumInsight password.
+            </p>
+
+            <p>
+                <a
+                    href="{reset_url}"
+                    style="
+                        display:inline-block;
+                        padding:12px 20px;
+                        background:#2563eb;
+                        color:white;
+                        text-decoration:none;
+                        border-radius:8px;
+                    "
+                >
+                    Reset Password
+                </a>
+            </p>
+
+            <p>
+                This link expires in 30 minutes and can
+                only be used once.
+            </p>
+
+            <p>
+                If you did not request this, you can
+                safely ignore this email.
+            </p>
+
+            <p>— QuantumInsight</p>
+        </div>
+        """,
+    }
+
+    try:
+        email_response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": brevo_api_key,
+                "content-type": "application/json",
+            },
+            json=email_payload,
+            timeout=15,
         )
+
+        if email_response.status_code >= 400:
+            raise RuntimeError(
+                f"Brevo API error: {email_response.text}"
+            )
 
     except Exception:
         raise HTTPException(
