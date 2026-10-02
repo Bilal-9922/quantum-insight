@@ -1,111 +1,102 @@
 import re
 
 
-def _find_quantum_circuit_size(code: str) -> int | None:
-    """
-    Extract the first QuantumCircuit qubit count.
-
-    Example:
-        qc = QuantumCircuit(2)
-        -> 2
-    """
-
+def _find_circuit_size(code: str) -> int | None:
     match = re.search(
         r"\bQuantumCircuit\s*\(\s*(\d+)",
         code,
         flags=re.IGNORECASE,
     )
 
-    if not match:
-        return None
+    if match:
+        return int(match.group(1))
 
-    return int(match.group(1))
+    return None
 
 
 def _find_circuit_names(code: str) -> list[str]:
-    """
-    Find variables assigned from QuantumCircuit().
-    """
-
     return re.findall(
         r"\b([A-Za-z_]\w*)\s*=\s*QuantumCircuit\s*\(",
         code,
     )
 
 
-def _find_invalid_qubit_fix(
+def _fix_qubit_index(
     code: str,
     invalid_index: int,
     circuit_size: int,
-) -> tuple[str, int] | None:
+):
     """
-    Find the Qiskit gate containing the invalid qubit and
-    replace only that argument.
-
-    We intentionally do NOT replace arbitrary numbers in the
-    source code.
+    Find the actual Qiskit operation containing the invalid
+    qubit index and replace only that argument.
     """
 
     if circuit_size <= 0:
         return None
 
+    # Use the first valid qubit.
     replacement_index = 0
 
     gate_pattern = re.compile(
-        r"(?P<prefix>\b[A-Za-z_]\w*\."
-        r"(?:h|x|y|z|s|sdg|t|tdg|rx|ry|rz|p|u|u1|u2|u3|"
-        r"cx|cy|cz|ch|swap|ccx|ccz|cswap|crx|cry|crz)"
-        r"\s*\()"
-        r"(?P<args>[^)]*)"
-        r"(?P<close>\))",
+        r"\b([A-Za-z_]\w*)\."
+        r"(h|x|y|z|s|sdg|t|tdg|sx|sxdg|id|reset|"
+        r"cx|cy|cz|ch|swap|iswap|ecr|ccx|cswap|"
+        r"rx|ry|rz|p|phase|u|u1|u2|u3)"
+        r"\s*\(([^)]*)\)",
         flags=re.IGNORECASE,
     )
 
     for match in gate_pattern.finditer(code):
-        args = match.group("args")
 
-        numbers = list(
+        args = match.group(3)
+
+        number_matches = list(
             re.finditer(
-                r"(?<![A-Za-z0-9_])(\d+)(?![A-Za-z0-9_])",
+                r"(?<![A-Za-z0-9_])(-?\d+)(?![A-Za-z0-9_])",
                 args,
             )
         )
 
-        for number_match in numbers:
+        for number_match in number_matches:
+
             value = int(number_match.group(1))
 
-            if value == invalid_index:
-                start = match.start("args") + number_match.start(1)
-                end = match.start("args") + number_match.end(1)
+            if value != invalid_index:
+                continue
 
-                fixed_code = (
-                    code[:start]
-                    + str(replacement_index)
-                    + code[end:]
-                )
+            args_start = match.start(3)
 
-                return fixed_code, replacement_index
+            replacement_start = (
+                args_start + number_match.start(1)
+            )
+
+            replacement_end = (
+                args_start + number_match.end(1)
+            )
+
+            return (
+                code[:replacement_start]
+                + str(replacement_index)
+                + code[replacement_end:]
+            )
 
     return None
 
 
-def _fix_missing_two_qubit_argument(code: str) -> tuple[str, str] | None:
+def _fix_missing_gate_argument(code: str):
     """
-    Fix common two-qubit gate calls such as:
+    Fix:
 
         qc.cx(0)
 
     into:
 
         qc.cx(0, 1)
-
-    Only fixes a gate that visibly contains exactly one
-    numeric qubit argument.
     """
 
     pattern = re.compile(
         r"\b([A-Za-z_]\w*)\."
-        r"(cx|cy|cz|ch|swap)"
+        r"(cx|cy|cz|ch|swap|iswap|ecr)"
         r"\s*\(\s*(\d+)\s*\)",
         flags=re.IGNORECASE,
     )
@@ -124,16 +115,14 @@ def _fix_missing_two_qubit_argument(code: str) -> tuple[str, str] | None:
         f"({first_qubit}, 1)"
     )
 
-    fixed_code = (
+    return (
         code[:match.start()]
         + replacement
         + code[match.end():]
     )
 
-    return fixed_code, gate_name
 
-
-def _fix_too_many_two_qubit_arguments(code: str) -> tuple[str, str] | None:
+def _fix_extra_gate_argument(code: str):
     """
     Fix:
 
@@ -142,13 +131,11 @@ def _fix_too_many_two_qubit_arguments(code: str) -> tuple[str, str] | None:
     into:
 
         qc.cx(0, 1)
-
-    This is specifically for two-qubit gates.
     """
 
     pattern = re.compile(
         r"\b([A-Za-z_]\w*)\."
-        r"(cx|cy|cz|ch|swap)"
+        r"(cx|cy|cz|ch|swap|iswap|ecr)"
         r"\s*\(\s*"
         r"(\d+)\s*,\s*(\d+)\s*,\s*(\d+)"
         r"\s*\)",
@@ -170,63 +157,128 @@ def _fix_too_many_two_qubit_arguments(code: str) -> tuple[str, str] | None:
         f"({first}, {second})"
     )
 
-    fixed_code = (
+    return (
         code[:match.start()]
         + replacement
         + code[match.end():]
     )
 
-    return fixed_code, gate_name
 
-
-def _fix_syntax_error(code: str) -> str | None:
+def _fix_undefined_variable(
+    code: str,
+    variable_name: str,
+):
     """
-    Fix the common case:
+    Fix an undefined variable used as a qubit argument.
+
+    Example:
+
+        qc.x(qubit)
+
+    becomes:
+
+        qc.x(0)
+    """
+
+    circuit_size = _find_circuit_size(code)
+
+    if circuit_size is None:
+        return None
+
+    replacement_index = 0
+
+    # Look specifically for the undefined variable inside
+    # a Qiskit gate's argument list.
+    pattern = re.compile(
+        rf"(\b[A-Za-z_]\w*\."
+        rf"(?:h|x|y|z|s|sdg|t|tdg|sx|sxdg|id|reset|"
+        rf"cx|cy|cz|ch|swap|iswap|ecr|ccx|cswap|"
+        rf"rx|ry|rz|p|phase|u|u1|u2|u3)"
+        rf"\s*\([^)]*)"
+        rf"\b{re.escape(variable_name)}\b"
+        rf"([^)]*\))",
+        flags=re.IGNORECASE,
+    )
+
+    match = pattern.search(code)
+
+    if not match:
+        return None
+
+    return (
+        code[:match.start()]
+        + match.group(1)
+        + str(replacement_index)
+        + match.group(2)
+        + code[match.end():]
+    )
+
+
+def _fix_syntax_error(code: str):
+    """
+    Repair the common Qiskit case:
 
         qc.cx(0, 1
 
-    where one closing parenthesis is missing.
+    into:
 
-    We repair the specific incomplete Qiskit call rather than
-    blindly appending ')' to the entire source.
+        qc.cx(0, 1)
     """
 
     lines = code.splitlines()
 
     for index, line in enumerate(lines):
-        stripped = line.strip()
 
-        if not stripped:
+        if not line.strip():
             continue
 
-        if (
-            re.search(
-                r"\b[A-Za-z_]\w*\."
-                r"[A-Za-z_]\w*\s*\([^)]*$",
-                stripped,
-            )
-            and stripped.count("(") > stripped.count(")")
-        ):
-            lines[index] = line + ")"
-            return "\n".join(lines)
+        open_count = line.count("(")
+        close_count = line.count(")")
 
-    # Fallback for a simple unmatched parenthesis.
+        if open_count > close_count:
+
+            # Only repair a line that looks like a function call.
+            if re.search(
+                r"\b[A-Za-z_]\w*\."
+                r"[A-Za-z_]\w*\s*\(",
+                line,
+            ):
+                lines[index] = line + (
+                    ")" * (open_count - close_count)
+                )
+
+                return "\n".join(lines)
+
+    # Fallback for simple unmatched parentheses.
     open_count = code.count("(")
     close_count = code.count(")")
 
     if open_count > close_count:
-        return code + (")" * (open_count - close_count))
+        return code + (
+            ")" * (open_count - close_count)
+        )
 
     return None
 
 
-def generate_patch(code: str, error_message: str | None):
+def generate_patch(
+    code: str,
+    error_message: str | None,
+):
     """
-    Generate a conservative automatic fix for common real
-    Qiskit programming errors.
+    Generate an automatic suggested fix for common real
+    Qiskit errors.
 
-    Every suggested fix is intended to be passed through the
-    verifier before being presented as verified.
+    The generated code is returned through:
+
+        suggested_fix["code"]
+
+    and:
+
+        fixed_code
+
+    The caller should verify fixed_code before treating it
+    as verified.
     """
 
     original_code = code or ""
@@ -234,7 +286,9 @@ def generate_patch(code: str, error_message: str | None):
 
     fixed_code = original_code
     changed = False
+
     note = "No automatic fix could be generated."
+
     suggested_fix = None
 
     # =========================================================
@@ -248,22 +302,26 @@ def generate_patch(code: str, error_message: str | None):
         or "parenthesis" in message
         or "unterminated" in message
     ):
-        candidate = _fix_syntax_error(original_code)
+
+        candidate = _fix_syntax_error(
+            original_code
+        )
 
         if candidate and candidate != original_code:
+
             fixed_code = candidate
             changed = True
 
             note = (
                 "A missing closing parenthesis was detected "
-                "in the Qiskit code and repaired."
+                "and repaired in the Qiskit code."
             )
 
             suggested_fix = {
                 "code": fixed_code,
                 "type": "SYNTAX_ERROR",
                 "warning": (
-                    "The syntax was automatically repaired. "
+                    "The missing parenthesis was repaired. "
                     "Review the corrected Qiskit code before execution."
                 ),
             }
@@ -273,49 +331,64 @@ def generate_patch(code: str, error_message: str | None):
     # =========================================================
 
     elif (
-        "index out of range" in message
-        or "out of range for size" in message
-        or "qubit index" in message
-        or "invalid qubit index" in message
+        "qubit index" in message
+        or "out of range" in message
         or "qubit does not exist" in message
     ):
+
+        # Supports BOTH:
+
+        # Index 3 out of range for size 2
+
+        # and:
+
+        # Qubit index 3 is out of range for a circuit
+        # with 2 qubit(s).
+
         match = re.search(
-            r"index\s+(\d+)\s+out\s+of\s+range\s+for\s+size\s+(\d+)",
+            r"index\s+(-?\d+).*?"
+            r"(?:size|with)\s+(\d+)",
             message,
         )
 
         if match:
-            invalid_index = int(match.group(1))
-            circuit_size = int(match.group(2))
 
-            fix = _find_invalid_qubit_fix(
+            invalid_index = int(
+                match.group(1)
+            )
+
+            circuit_size = int(
+                match.group(2)
+            )
+
+            candidate = _fix_qubit_index(
                 original_code,
                 invalid_index,
                 circuit_size,
             )
 
-            if fix:
-                fixed_code, suggested_index = fix
-                changed = fixed_code != original_code
+            if candidate and candidate != original_code:
 
-                if changed:
-                    note = (
-                        f"Qubit index {invalid_index} is invalid for "
-                        f"a {circuit_size}-qubit circuit. "
-                        f"The invalid gate argument was changed to "
-                        f"qubit {suggested_index}."
-                    )
+                fixed_code = candidate
+                changed = True
 
-                    suggested_fix = {
-                        "code": fixed_code,
-                        "type": "QUBIT_INDEX_ERROR",
-                        "invalid_qubit": invalid_index,
-                        "suggested_qubit": suggested_index,
-                        "warning": (
-                            "The replacement uses a valid qubit index. "
-                            "Verify that it matches the intended circuit logic."
-                        ),
-                    }
+                note = (
+                    f"Qubit index {invalid_index} is invalid "
+                    f"for a {circuit_size}-qubit circuit. "
+                    "It was replaced with qubit 0."
+                )
+
+                suggested_fix = {
+                    "code": fixed_code,
+                    "type": "QUBIT_INDEX_ERROR",
+                    "invalid_qubit": invalid_index,
+                    "suggested_qubit": 0,
+                    "warning": (
+                        "The invalid qubit index was replaced "
+                        "with a valid index. Verify that qubit 0 "
+                        "matches your intended circuit logic."
+                    ),
+                }
 
     # =========================================================
     # 3. CLASSICAL BIT INDEX ERROR
@@ -328,21 +401,30 @@ def generate_patch(code: str, error_message: str | None):
             and "out of range" in message
         )
     ):
+
         match = re.search(
-            r"classical bit index\s+(\d+)"
-            r"\s+is out of range.*?"
-            r"(\d+)\s+classical bit",
+            r"classical bit index\s+(-?\d+).*?"
+            r"(?:with|has)\s+(\d+)\s+classical bit",
             message,
         )
 
         if match:
-            invalid_index = int(match.group(1))
-            classical_size = int(match.group(2))
+
+            invalid_index = int(
+                match.group(1)
+            )
+
+            classical_size = int(
+                match.group(2)
+            )
 
             if classical_size > 0:
-                suggested_index = classical_size - 1
 
-                measure_pattern = re.compile(
+                replacement_index = (
+                    classical_size - 1
+                )
+
+                pattern = re.compile(
                     rf"(\bmeasure\s*\(\s*"
                     rf"[^,()]+\s*,\s*)"
                     rf"{invalid_index}"
@@ -350,31 +432,33 @@ def generate_patch(code: str, error_message: str | None):
                     flags=re.IGNORECASE,
                 )
 
-                candidate = measure_pattern.sub(
-                    rf"\g<1>{suggested_index}\g<2>",
+                candidate = pattern.sub(
+                    rf"\g<1>{replacement_index}\g<2>",
                     original_code,
                     count=1,
                 )
 
                 if candidate != original_code:
+
                     fixed_code = candidate
                     changed = True
 
                     note = (
-                        f"Classical bit index {invalid_index} is "
-                        f"outside the circuit's {classical_size} "
-                        f"classical bits. It was changed to "
-                        f"{suggested_index}."
+                        f"Classical bit index "
+                        f"{invalid_index} is invalid. "
+                        f"It was changed to "
+                        f"{replacement_index}."
                     )
 
                     suggested_fix = {
                         "code": fixed_code,
                         "type": "CLASSICAL_BIT_INDEX_ERROR",
                         "invalid_bit": invalid_index,
-                        "suggested_bit": suggested_index,
+                        "suggested_bit": replacement_index,
                         "warning": (
-                            "The measurement was mapped to a valid "
-                            "classical bit. Verify the intended mapping."
+                            "The measurement was mapped to a "
+                            "valid classical bit. Verify the "
+                            "intended measurement mapping."
                         ),
                     }
 
@@ -383,64 +467,66 @@ def generate_patch(code: str, error_message: str | None):
     # =========================================================
 
     elif (
-        "requires 2 qubit arguments" in message
-        or "requires 2 qubits" in message
+        "gate argument" in message
+        or "expects" in message
+        and "argument" in message
+        or "argument(s)" in message
         or "only 1 was provided" in message
-        or "one argument" in message
-        or "too many arguments" in message
-        or "too many qubits" in message
-        or "argument" in message
-        and "provided" in message
+        or "too many" in message
     ):
+
         # -----------------------------------------------------
-        # Missing second qubit
+        # Missing argument
         # -----------------------------------------------------
 
-        fix = _fix_missing_two_qubit_argument(original_code)
+        candidate = _fix_missing_gate_argument(
+            original_code
+        )
 
-        if fix:
-            fixed_code, gate_name = fix
+        if candidate and candidate != original_code:
+
+            fixed_code = candidate
             changed = True
 
             note = (
-                f"The {gate_name} gate requires two qubit "
-                "arguments. A valid second qubit was added."
+                "The two-qubit gate was missing its "
+                "second qubit argument. Qubit 1 was added."
             )
 
             suggested_fix = {
                 "code": fixed_code,
                 "type": "GATE_ARGUMENT_ERROR",
-                "gate": gate_name,
                 "warning": (
-                    "Qubit 1 was selected as the second argument. "
-                    "Verify that this is the intended target qubit."
+                    "A valid second qubit was added. "
+                    "Verify that it is the intended target."
                 ),
             }
 
         else:
+
             # -------------------------------------------------
-            # Too many qubits
+            # Too many arguments
             # -------------------------------------------------
 
-            fix = _fix_too_many_two_qubit_arguments(
+            candidate = _fix_extra_gate_argument(
                 original_code
             )
 
-            if fix:
-                fixed_code, gate_name = fix
+            if candidate and candidate != original_code:
+
+                fixed_code = candidate
                 changed = True
 
                 note = (
-                    f"The {gate_name} gate accepts two qubit "
-                    "arguments. The extra argument was removed."
+                    "The two-qubit gate contained an extra "
+                    "qubit argument. The extra argument was removed."
                 )
 
                 suggested_fix = {
                     "code": fixed_code,
                     "type": "GATE_ARGUMENT_ERROR",
-                    "gate": gate_name,
                     "warning": (
-                        "The extra qubit argument was removed. "
+                        "The extra argument was removed. "
                         "Verify the intended circuit operation."
                     ),
                 }
@@ -453,55 +539,99 @@ def generate_patch(code: str, error_message: str | None):
         "nameerror" in message
         or "is not defined" in message
     ):
-        circuit_definitions = _find_circuit_names(
-            original_code
-        )
 
         name_match = re.search(
-            r"name ['\"]([a-zA-Z_]\w*)['\"] is not defined",
+            r"name\s+['\"]([a-zA-Z_]\w*)['\"]"
+            r"\s+is not defined",
             message,
         )
 
-        if name_match and len(circuit_definitions) == 1:
-            undefined_name = name_match.group(1)
-            correct_name = circuit_definitions[0]
+        if name_match:
 
-            # Only replace the undefined name when it appears
-            # as a circuit/gate receiver or obvious variable.
-            candidate = re.sub(
-                rf"(?<![A-Za-z0-9_])"
-                rf"{re.escape(undefined_name)}"
-                rf"(?=\s*\.)",
-                correct_name,
-                original_code,
+            undefined_name = (
+                name_match.group(1)
             )
 
-            if candidate != original_code:
+            candidate = _fix_undefined_variable(
+                original_code,
+                undefined_name,
+            )
+
+            if candidate and candidate != original_code:
+
                 fixed_code = candidate
                 changed = True
 
                 note = (
-                    f"The undefined variable '{undefined_name}' "
-                    f"was replaced with the detected "
-                    f"QuantumCircuit variable '{correct_name}'."
+                    f"The undefined qubit variable "
+                    f"'{undefined_name}' was replaced "
+                    "with valid qubit index 0."
                 )
 
                 suggested_fix = {
                     "code": fixed_code,
                     "type": "NAME_ERROR",
                     "undefined_name": undefined_name,
-                    "suggested_name": correct_name,
+                    "suggested_value": 0,
                     "warning": (
-                        "The replacement uses the detected "
-                        "QuantumCircuit variable."
+                        "The undefined variable was replaced "
+                        "with qubit 0. Verify that this is "
+                        "the intended qubit."
                     ),
                 }
+
+            else:
+
+                # Handle an undefined circuit object.
+                circuit_names = _find_circuit_names(
+                    original_code
+                )
+
+                if len(circuit_names) == 1:
+
+                    correct_name = (
+                        circuit_names[0]
+                    )
+
+                    receiver_pattern = re.compile(
+                        rf"(?<![A-Za-z0-9_])"
+                        rf"{re.escape(undefined_name)}"
+                        rf"(?=\s*\.)"
+                    )
+
+                    candidate = receiver_pattern.sub(
+                        correct_name,
+                        original_code,
+                    )
+
+                    if candidate != original_code:
+
+                        fixed_code = candidate
+                        changed = True
+
+                        note = (
+                            f"The undefined circuit variable "
+                            f"'{undefined_name}' was replaced "
+                            f"with '{correct_name}'."
+                        )
+
+                        suggested_fix = {
+                            "code": fixed_code,
+                            "type": "NAME_ERROR",
+                            "undefined_name": undefined_name,
+                            "suggested_name": correct_name,
+                            "warning": (
+                                "The circuit variable was replaced "
+                                "with the detected QuantumCircuit."
+                            ),
+                        }
 
     # =========================================================
     # 6. NO AUTOMATIC FIX
     # =========================================================
 
     if not suggested_fix:
+
         suggested_fix = {
             "code": "",
             "type": "NO_AUTOMATIC_FIX",
