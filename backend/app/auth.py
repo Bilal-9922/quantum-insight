@@ -500,3 +500,105 @@ def current_user(
         )
 
     return _user(response.data[0])
+
+def delete_user_account(
+    user_id: int,
+    password: str,
+):
+    """
+    Permanently delete a user's account.
+
+    The current password must be verified before deletion.
+    Google-created accounts cannot use this password-based
+    deletion flow because they do not have a local password.
+    """
+
+    try:
+        response = (
+            supabase
+            .table("users")
+            .select("*")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to verify your account.",
+        )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail="User account not found.",
+        )
+
+    row = response.data[0]
+
+    # Google-created accounts do not have a local password.
+    if not row.get("password_hash") or not row.get("salt"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This account uses Google Sign-In and does not "
+                "have a password. Account deletion through "
+                "password verification is not available."
+            ),
+        )
+
+    # Verify the current password.
+    current_hash, _ = _hash_password(
+        password,
+        row["salt"],
+    )
+
+    if not hmac.compare_digest(
+        current_hash,
+        row["password_hash"],
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect password.",
+        )
+
+    # Delete password-reset records first because they
+    # reference the users table.
+    try:
+        (
+            supabase
+            .table("password_resets")
+            .delete()
+            .eq("user_id", user_id)
+            .execute()
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to remove account recovery data.",
+        )
+
+    # Delete the user account.
+    try:
+        delete_response = (
+            supabase
+            .table("users")
+            .delete()
+            .eq("id", user_id)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to delete your account.",
+        )
+
+    if not delete_response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to delete your account.",
+        )
+
+    return True
