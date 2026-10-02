@@ -180,109 +180,6 @@ export default function Profile() {
                 You will need to authenticate again to access
                 your QuantumInsight workspace.
               </p>
-
-              {/* Delete Account */}
-              <div className="mt-6 border-t border-white/5 pt-5">
-                <div className="rounded-2xl border border-rose-400/10 bg-rose-400/[.025] p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-400/10 text-rose-300">
-                      <Icon name="shield" size={15} />
-                    </span>
-
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-rose-300">
-                        Delete account
-                      </p>
-
-                      <p className="mt-1 text-[10px] leading-5 text-slate-600">
-                        Permanently delete your QuantumInsight
-                        account and associated account data.
-                      </p>
-                    </div>
-                  </div>
-
-                  {!showDeleteAccount ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDeleteAccount(true);
-                        setDeleteError("");
-                      }}
-                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-400/15 bg-rose-400/5 px-4 py-3 text-xs font-bold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/10"
-                    >
-                      <Icon name="logout" size={14} />
-                      Delete Account
-                    </button>
-                  ) : (
-                    <div className="mt-4">
-                      <div className="rounded-xl border border-rose-400/10 bg-black/10 p-3">
-                        <p className="text-[11px] font-semibold text-rose-300">
-                          This action cannot be undone.
-                        </p>
-
-                        <p className="mt-1 text-[10px] leading-5 text-slate-600">
-                          Enter your password below to permanently
-                          delete your account.
-                        </p>
-                      </div>
-
-                      <input
-                        type="password"
-                        value={deletePassword}
-                        onChange={(event) => {
-                          setDeletePassword(event.target.value);
-                          setDeleteError("");
-                        }}
-                        placeholder="Enter your password"
-                        disabled={deleteBusy}
-                        className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none transition placeholder:text-slate-700 focus:border-rose-400/30"
-                      />
-
-                      {deleteError && (
-                        <div className="mt-3 rounded-xl border border-rose-400/15 bg-rose-400/[.04] px-3 py-2">
-                          <p className="text-[10px] leading-5 text-rose-300">
-                            {deleteError}
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowDeleteAccount(false);
-                            setDeletePassword("");
-                            setDeleteError("");
-                          }}
-                          disabled={deleteBusy}
-                          className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[.02] px-4 py-3 text-xs font-bold text-slate-400 transition hover:border-white/15 hover:bg-white/[.04] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          Cancel
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleDeleteAccount}
-                          disabled={deleteBusy || !deletePassword.trim()}
-                          className="flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {deleteBusy ? (
-                            <>
-                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-300/30 border-t-rose-300" />
-                              Deleting...
-                            </>
-                          ) : (
-                            <>
-                              <Icon name="logout" size={14} />
-                              Permanently Delete
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -371,6 +268,124 @@ export default function Profile() {
               />
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Danger Zone */}
+      <section className="rounded-3xl border border-rose-400/20 bg-rose-400/[.035] overflow-hidden">
+        <div className="border-b border-rose-400/10 px-5 py-5 sm:px-6">
+          <div className="flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
+              <Icon name="shield" size={17} />
+            </span>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-300">
+                Danger Zone
+              </p>
+
+              <h2 className="mt-1 text-lg font-bold text-white">
+                Delete your QuantumInsight account
+              </h2>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold text-slate-300">
+                Permanently delete your account
+              </p>
+
+              <p className="mt-2 text-xs leading-6 text-slate-500">
+                This permanently removes your QuantumInsight
+                account and associated account data. This action
+                cannot be undone.
+              </p>
+            </div>
+
+            {!showDeleteAccount && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteAccount(true);
+                  setDeleteError("");
+                }}
+                className="flex shrink-0 items-center justify-center gap-2 rounded-xl border border-rose-400/25 bg-rose-400/10 px-5 py-3 text-sm font-bold text-rose-300 transition hover:border-rose-400/40 hover:bg-rose-400/15"
+              >
+                <Icon name="logout" size={15} />
+                Delete Account
+              </button>
+            )}
+          </div>
+
+          {showDeleteAccount && (
+            <div className="mt-5 rounded-2xl border border-rose-400/15 bg-black/10 p-4 sm:p-5">
+              <p className="text-sm font-bold text-rose-300">
+                Confirm account deletion
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-slate-600">
+                Enter your current account password to permanently
+                delete your account.
+              </p>
+
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(event) => {
+                  setDeletePassword(event.target.value);
+                  setDeleteError("");
+                }}
+                placeholder="Enter your password"
+                disabled={deleteBusy}
+                className="mt-4 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none transition placeholder:text-slate-700 focus:border-rose-400/30"
+              />
+
+              {deleteError && (
+                <div className="mt-3 rounded-xl border border-rose-400/15 bg-rose-400/[.04] px-4 py-3">
+                  <p className="text-xs leading-5 text-rose-300">
+                    {deleteError}
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteAccount(false);
+                    setDeletePassword("");
+                    setDeleteError("");
+                  }}
+                  disabled={deleteBusy}
+                  className="flex items-center justify-center rounded-xl border border-white/10 bg-white/[.02] px-5 py-3 text-sm font-bold text-slate-400 transition hover:bg-white/[.04] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleteBusy || !deletePassword.trim()}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-rose-400/25 bg-rose-400/10 px-5 py-3 text-sm font-bold text-rose-300 transition hover:border-rose-400/40 hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {deleteBusy ? (
+                    <>
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-300/30 border-t-rose-300" />
+                      Deleting Account...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="logout" size={15} />
+                      Permanently Delete Account
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
