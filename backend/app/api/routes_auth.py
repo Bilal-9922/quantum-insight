@@ -1,5 +1,6 @@
 import os
 import re
+from html import escape
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,14 +9,15 @@ from pydantic import BaseModel, Field
 from app.auth import (
     authenticate,
     change_password,
+    create_email_verification,
     create_password_reset_token,
     create_token,
     current_user,
     delete_user_account,
     init_auth_db,
-    register_user,
     reset_password,
     update_user_name,
+    verify_email_code,
 )
 from app.core.supabase import supabase
 
@@ -29,6 +31,11 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     email: str
     password: str = Field(min_length=8, max_length=128)
+
+
+class VerifyEmailRequest(BaseModel):
+    email: str
+    code: str = Field(min_length=6, max_length=6)
 
 
 class LoginRequest(BaseModel):
@@ -77,26 +84,200 @@ class DeleteAccountRequest(BaseModel):
     )
 
 
+def send_verification_email(
+    name: str,
+    email: str,
+    verification_code: str,
+):
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+
+    if not brevo_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Email service is not configured.",
+        )
+
+    safe_name = escape(name)
+    safe_code = escape(verification_code)
+
+    email_payload = {
+        "sender": {
+            "name": "QuantumInsight",
+            "email": "bilalshaikh1339@gmail.com",
+        },
+        "to": [
+            {
+                "email": email,
+                "name": name,
+            }
+        ],
+        "subject": "Verify your QuantumInsight account",
+        "htmlContent": f"""
+        <div style="
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+            background: #ffffff;
+            color: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        ">
+
+            <h2 style="
+                margin-top: 0;
+                color: #0f172a;
+            ">
+                Verify your QuantumInsight account
+            </h2>
+
+            <p>
+                Hello {safe_name},
+            </p>
+
+            <p>
+                Thank you for creating a QuantumInsight account.
+                Please verify your email address using the
+                verification code below.
+            </p>
+
+            <div style="
+                margin: 30px 0;
+                padding: 20px;
+                background: #f1f5f9;
+                border-radius: 10px;
+                text-align: center;
+            ">
+                <div style="
+                    font-size: 14px;
+                    color: #64748b;
+                    margin-bottom: 10px;
+                ">
+                    Your verification code
+                </div>
+
+                <div style="
+                    font-size: 32px;
+                    font-weight: 700;
+                    letter-spacing: 8px;
+                    color: #2563eb;
+                ">
+                    {safe_code}
+                </div>
+            </div>
+
+            <p>
+                This verification code expires in
+                <strong>10 minutes</strong>.
+            </p>
+
+            <p>
+                If you did not create a QuantumInsight account,
+                you can safely ignore this email.
+            </p>
+
+            <p style="
+                margin-top: 30px;
+                color: #64748b;
+            ">
+                — QuantumInsight
+            </p>
+
+        </div>
+        """,
+    }
+
+    try:
+        email_response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": brevo_api_key,
+                "content-type": "application/json",
+            },
+            json=email_payload,
+            timeout=15,
+        )
+
+        if email_response.status_code >= 400:
+            raise RuntimeError(
+                f"Brevo API error: {email_response.text}"
+            )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to send verification email.",
+        )
+
+
 @router.post("/auth/register")
 def register(req: RegisterRequest):
+    email = req.email.strip().lower()
+
     if not re.fullmatch(
         r"[^@\s]+@[^@\s]+\.[^@\s]+",
-        req.email.strip(),
+        email,
     ):
         raise HTTPException(
             status_code=422,
             detail="Enter a valid email address.",
         )
 
-    user = register_user(
+    verification = create_email_verification(
         req.name,
-        req.email,
+        email,
         req.password,
     )
 
+    send_verification_email(
+        verification["name"],
+        verification["email"],
+        verification["verification_code"],
+    )
+
     return {
+        "success": True,
+        "verification_required": True,
+        "email": verification["email"],
+        "message": (
+            "A verification code has been sent to your email address."
+        ),
+    }
+
+
+@router.post("/auth/verify-email")
+def verify_email(req: VerifyEmailRequest):
+    email = req.email.strip().lower()
+
+    if not re.fullmatch(
+        r"[^@\s]+@[^@\s]+\.[^@\s]+",
+        email,
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Enter a valid email address.",
+        )
+
+    if not re.fullmatch(r"\d{6}", req.code):
+        raise HTTPException(
+            status_code=422,
+            detail="Verification code must contain 6 digits.",
+        )
+
+    user = verify_email_code(
+        email,
+        req.code,
+    )
+
+    return {
+        "success": True,
         "user": user,
         "token": create_token(user),
+        "message": (
+            "Email verified successfully. "
+            "Your QuantumInsight account has been created."
+        ),
     }
 
 
@@ -307,7 +488,6 @@ def forgot_password(req: ForgotPasswordRequest):
             detail="Email service is not configured.",
         )
 
-    # Brevo transactional email payload.
     email_payload = {
         "sender": {
             "name": "QuantumInsight",
@@ -340,7 +520,7 @@ def forgot_password(req: ForgotPasswordRequest):
             </h2>
 
             <p>
-                Hello {user["name"]},
+                Hello {escape(user["name"])},
             </p>
 
             <p>
