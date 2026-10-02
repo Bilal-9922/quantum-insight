@@ -156,30 +156,32 @@ def debug(
     # - Other Qiskit-related errors
     # ---------------------------------------------------------
 
-    runner_result = run_qiskit_check(req.code)
+    rdetected_error = runner_result.get("error")
+    runner_success = runner_result.get("success") is True
+    
+    # ---------------------------------------------------------
+    # The Qiskit runner is the authoritative validation layer.
+    #
+    # If Qiskit successfully validates the submitted circuit,
+    # do not allow a manually supplied/stale error message to
+    # turn a valid circuit into GENERAL_ERROR.
+    # ---------------------------------------------------------
 
-    detected_error = runner_result.get("error")
-
-    # Prefer an error detected directly from the Qiskit
-    # validation layer. If none was detected, fall back to
-    # the error manually supplied by the user.
-    error_message = detected_error or req.error
-
-    error_type = runner_result.get("error_type")
 
     # ---------------------------------------------------------
     # 4. Determine the error type
     # ---------------------------------------------------------
 
-    if not error_type:
-
-        if (
-            not error_message
-            and runner_result.get("success") is True
-        ):
-            error_type = "NO_ERROR"
-
-        else:
+    if runner_success and not detected_error:
+        error_message = None
+        error_type = "NO_ERROR"
+    
+    else:
+        error_message = detected_error or req.error
+    
+        error_type = runner_result.get("error_type")
+    
+        if not error_type:
             error_type = classify(error_message)
 
     # ---------------------------------------------------------
