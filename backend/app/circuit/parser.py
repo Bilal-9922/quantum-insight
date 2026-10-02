@@ -1,4 +1,3 @@
-```python
 import ast
 import re
 
@@ -977,4 +976,3 @@ def circuit_to_gate_list(circuit):
         return circuit["gates"]
 
     return []
-```
