@@ -1,3 +1,4 @@
+```tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -20,6 +21,7 @@ type HistoryItem = {
   };
   health_score: number;
   health_category: string;
+  qmi_score: number | null;
   anomaly_score: number;
   recommendations: {
     summary: string;
@@ -182,6 +184,11 @@ export default function History() {
             item.health_score || 0
           ).toFixed(1)}/100`,
           `Health Category: ${item.health_category}`,
+          `Quantum Maintainability Index: ${
+            item.qmi_score != null
+              ? Number(item.qmi_score).toFixed(1) + "/100"
+              : "Not available"
+          }`,
           `Qubits: ${item.metrics?.qubits ?? "—"}`,
           `Gates: ${item.metrics?.gate_count ?? "—"}`,
           `Depth: ${item.metrics?.depth ?? "—"}`,
@@ -250,6 +257,7 @@ export default function History() {
       "Analysis ID",
       "Date",
       "QHI Score",
+      "QMI Score",
       "Health Category",
       "Qubits",
       "Gates",
@@ -280,6 +288,11 @@ export default function History() {
         ),
         escapeCsv(
           Number(item.health_score || 0).toFixed(1)
+        ),
+        escapeCsv(
+          item.qmi_score != null
+            ? Number(item.qmi_score).toFixed(1)
+            : ""
         ),
         escapeCsv(item.health_category || ""),
         escapeCsv(item.metrics?.qubits ?? ""),
@@ -453,8 +466,8 @@ export default function History() {
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-400">
               Review your previously analyzed quantum
-              circuits, health scores, anomalies and AI
-              recommendations.
+              circuits, health scores, maintainability,
+              anomalies and AI recommendations.
             </p>
 
             <div className="mt-5 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
@@ -525,7 +538,8 @@ export default function History() {
 
                 <p className="mt-1 text-xs leading-5 text-slate-500">
                   Select up to two saved analyses to compare
-                  their quantum health metrics.
+                  their quantum health and maintainability
+                  metrics.
                 </p>
               </div>
             </div>
@@ -777,10 +791,20 @@ function HistoryCard({
 }) {
   const qhi = Number(item.health_score || 0);
 
+  const qmi =
+    item.qmi_score != null
+      ? Number(item.qmi_score)
+      : null;
+
   const qhiProgress = Math.max(
     0,
     Math.min(100, qhi)
   );
+
+  const qmiProgress =
+    qmi != null
+      ? Math.max(0, Math.min(100, qmi))
+      : 0;
 
   return (
     <article
@@ -845,10 +869,9 @@ function HistoryCard({
             </p>
           </div>
 
-          <div className="flex items-center gap-4 lg:min-w-[220px] lg:justify-end">
-            <div className="hidden h-12 w-px bg-white/5 sm:block" />
-
-            <div className="min-w-[120px]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center lg:min-w-[430px] lg:justify-end">
+            {/* QHI */}
+            <div className="min-w-[150px]">
               <div className="flex items-center justify-between gap-4">
                 <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-600">
                   Quantum Health
@@ -870,6 +893,36 @@ function HistoryCard({
                     width: `${qhiProgress}%`,
                   }}
                 />
+              </div>
+            </div>
+
+            {/* QMI */}
+            <div className="min-w-[150px] sm:border-l sm:border-white/5 sm:pl-4">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-600">
+                  Quantum Maintainability
+                </p>
+
+                <span className="text-[10px] text-slate-600">
+                  /100
+                </span>
+              </div>
+
+              <div className="mt-1 text-3xl font-black tracking-tight text-violet-300">
+                {qmi != null
+                  ? qmi.toFixed(1)
+                  : "—"}
+              </div>
+
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/5">
+                {qmi != null && (
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-violet-400 to-cyan-400"
+                    style={{
+                      width: `${qmiProgress}%`,
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -913,6 +966,53 @@ function HistoryCard({
         </summary>
 
         <div className="space-y-6 border-t border-white/5 px-5 pb-6 pt-5 sm:px-6">
+          {/* Quality metrics */}
+          <div>
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
+              Quality metrics
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-cyan-400/10 bg-cyan-400/[.035] p-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-400/60">
+                  Quantum Health Index
+                </p>
+
+                <p className="mt-2 text-2xl font-black text-cyan-300">
+                  {qhi.toFixed(1)}
+                  <span className="ml-1 text-sm text-slate-600">
+                    /100
+                  </span>
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  {item.health_category}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-violet-400/10 bg-violet-400/[.035] p-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-violet-400/60">
+                  Quantum Maintainability Index
+                </p>
+
+                <p className="mt-2 text-2xl font-black text-violet-300">
+                  {qmi != null
+                    ? qmi.toFixed(1)
+                    : "—"}
+                  <span className="ml-1 text-sm text-slate-600">
+                    /100
+                  </span>
+                </p>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  {qmi != null
+                    ? "Maintainability score"
+                    : "Not available for this record"}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Circuit */}
           <div>
             <div className="mb-2 flex items-center justify-between">
@@ -1019,6 +1119,22 @@ function ComparisonPanel({
       second: `${Number(
         second.health_score || 0
       ).toFixed(1)}/100`,
+      highlight: true,
+    },
+    {
+      label: "Quantum Maintainability Index",
+      first:
+        first.qmi_score != null
+          ? `${Number(
+              first.qmi_score
+            ).toFixed(1)}/100`
+          : "—",
+      second:
+        second.qmi_score != null
+          ? `${Number(
+              second.qmi_score
+            ).toFixed(1)}/100`
+          : "—",
       highlight: true,
     },
     {
@@ -1144,12 +1260,12 @@ function ComparisonPanel({
             </div>
 
             <h2 className="mt-3 text-xl font-black text-white">
-              Circuit Health Comparison
+              Circuit Quality Comparison
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
               Compare the selected quantum circuit
-              analyses side by side.
+              analyses, including QHI and QMI.
             </p>
           </div>
 
@@ -1282,6 +1398,11 @@ function ComparisonIdentity({
   label: string;
   item: HistoryItem;
 }) {
+  const qmi =
+    item.qmi_score != null
+      ? Number(item.qmi_score)
+      : null;
+
   return (
     <div className="bg-slate-950/80 p-5 sm:p-6">
       <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-600">
@@ -1301,16 +1422,30 @@ function ComparisonIdentity({
           </p>
         </div>
 
-        <div className="text-right">
-          <p className="text-2xl font-black text-cyan-300">
-            {Number(
-              item.health_score || 0
-            ).toFixed(1)}
-          </p>
+        <div className="flex items-end gap-5 text-right">
+          <div>
+            <p className="text-2xl font-black text-cyan-300">
+              {Number(
+                item.health_score || 0
+              ).toFixed(1)}
+            </p>
 
-          <p className="text-[9px] uppercase tracking-widest text-slate-600">
-            QHI
-          </p>
+            <p className="text-[9px] uppercase tracking-widest text-slate-600">
+              QHI
+            </p>
+          </div>
+
+          <div>
+            <p className="text-2xl font-black text-violet-300">
+              {qmi != null
+                ? qmi.toFixed(1)
+                : "—"}
+            </p>
+
+            <p className="text-[9px] uppercase tracking-widest text-slate-600">
+              QMI
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -1398,3 +1533,4 @@ function ComparisonExplanation({
     </div>
   );
 }
+```
