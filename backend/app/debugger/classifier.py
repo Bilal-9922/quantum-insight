@@ -2,6 +2,13 @@ def classify(message):
     m = (message or "").lower().strip()
 
     # ---------------------------------------------------------
+    # No error
+    # ---------------------------------------------------------
+
+    if not m:
+        return "NO_ERROR"
+
+    # ---------------------------------------------------------
     # Syntax errors
     # ---------------------------------------------------------
 
@@ -48,11 +55,10 @@ def classify(message):
         "classical bit",
         "clbit",
         "classical-bit",
+        "classical bit index",
         "out of range for a circuit with",
     ]
 
-    # Only classify as classical when the message explicitly
-    # refers to a classical bit.
     if any(pattern in m for pattern in classical_patterns):
         return "CLASSICAL_BIT_INDEX_ERROR"
 
@@ -72,6 +78,7 @@ def classify(message):
         "too many qubits",
         "number of qubits",
         "qubit does not exist",
+        "qubit index is out of range",
     ]
 
     if any(pattern in m for pattern in qubit_index_patterns):
@@ -79,6 +86,15 @@ def classify(message):
 
     # ---------------------------------------------------------
     # Gate argument errors
+    # ---------------------------------------------------------
+    #
+    # Covers both QuantumInsight messages and actual Qiskit
+    # messages such as:
+    #
+    # "The cx gate requires 2 qubit arguments,
+    #  but only 1 was provided."
+    #
+    # "Gate 'cx' expects 2 argument(s), but 1 were provided."
     # ---------------------------------------------------------
 
     gate_argument_patterns = [
@@ -91,6 +107,19 @@ def classify(message):
         "too few arguments",
         "too many arguments",
         "amount of qubit arguments",
+        "requires 1 qubit argument",
+        "requires 2 qubit arguments",
+        "requires 3 qubit arguments",
+        "requires 4 qubit arguments",
+        "requires 1 argument",
+        "requires 2 arguments",
+        "requires 3 arguments",
+        "requires 4 arguments",
+        "qubit arguments",
+        "only 1 was provided",
+        "only 2 were provided",
+        "only 3 were provided",
+        "only 4 were provided",
     ]
 
     if any(pattern in m for pattern in gate_argument_patterns):
@@ -163,4 +192,4 @@ def classify(message):
     # General fallback
     # ---------------------------------------------------------
 
-    return "GENERAL_ERROR"
+    return "NO_ERROR"
