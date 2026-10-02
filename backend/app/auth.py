@@ -935,6 +935,79 @@ def delete_user_account(
 
     return True
 
+def admin_delete_user_account(
+    user_id: int,
+):
+    """
+    Permanently delete a user account by administrator request.
+
+    This function does not require the user's password because
+    authorization is handled by the admin-only API endpoint.
+    """
+
+    try:
+        response = (
+            supabase
+            .table("users")
+            .select("id, email")
+            .eq("id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to verify the selected user.",
+        )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail="User account not found.",
+        )
+
+    # Delete password-reset records first because they
+    # reference the users table.
+    try:
+        (
+            supabase
+            .table("password_resets")
+            .delete()
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to remove account recovery data.",
+        )
+
+    # Delete the selected user account.
+    try:
+        delete_response = (
+            supabase
+            .table("users")
+            .delete()
+            .eq("id", user_id)
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to delete the selected account.",
+        )
+
+    if not delete_response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to delete the selected account.",
+        )
+
+    return True
+
 def admin_user(
     authorization: str | None = Header(default=None),
 ):
