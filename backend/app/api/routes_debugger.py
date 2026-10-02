@@ -9,6 +9,11 @@ from app.debugger.patch_generator import generate_patch
 from app.debugger.verifier import verify
 from app.debugger.qiskit_runner import run_qiskit_check
 
+from app.circuit.parser import (
+    parse_qiskit_code,
+    UnsupportedQuantumCodeError,
+)
+
 
 router = APIRouter(tags=["debugger"])
 
@@ -23,13 +28,30 @@ class DebugRequest(BaseModel):
 def debug(req: DebugRequest, user=Depends(current_user)):
 
     # ---------------------------------------------------------
+    # Validate that the submitted source is real Qiskit code
+    # ---------------------------------------------------------
+
+    try:
+        parse_qiskit_code(req.code)
+
+    except UnsupportedQuantumCodeError as exc:
+        return {
+            "success": False,
+            "error": {
+                "type": "UNSUPPORTED_QUANTUM_CODE",
+                "message": str(exc),
+            },
+            "message": str(exc),
+        }
+
+    # ---------------------------------------------------------
     # AST analysis
     # ---------------------------------------------------------
 
     ast_result = analyze_ast(req.code)
 
     # ---------------------------------------------------------
-    # Run the submitted code through the circuit checker
+    # Run the submitted Qiskit code through the circuit checker
     # ---------------------------------------------------------
 
     runner_result = run_qiskit_check(req.code)
