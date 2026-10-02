@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.auth import (
+    admin_user,
     authenticate,
     change_password,
     create_email_verification,
@@ -19,6 +20,7 @@ from app.auth import (
     update_user_name,
     verify_email_code,
 )
+
 from app.core.supabase import supabase
 
 
