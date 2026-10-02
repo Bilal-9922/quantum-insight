@@ -7,17 +7,54 @@ def classify(message):
 
     syntax_patterns = [
         "syntaxerror",
+        "syntax error",
         "invalid syntax",
         "unexpected indent",
         "unexpected token",
         "unterminated",
         "parenthesis",
+        "parentheses",
         "bracket",
         "invalid decimal literal",
+        "was never closed",
+        "expected an indented block",
     ]
 
     if any(pattern in m for pattern in syntax_patterns):
         return "SYNTAX_ERROR"
+
+    # ---------------------------------------------------------
+    # Undefined names / variables
+    # ---------------------------------------------------------
+
+    name_patterns = [
+        "nameerror",
+        "name error",
+        "is not defined",
+        "undefined variable",
+        "undefined name",
+        "unknown variable",
+    ]
+
+    if any(pattern in m for pattern in name_patterns):
+        return "NAME_ERROR"
+
+    # ---------------------------------------------------------
+    # Classical-bit index errors
+    # ---------------------------------------------------------
+
+    classical_patterns = [
+        "classical bit index",
+        "classical bit",
+        "clbit",
+        "classical-bit",
+        "out of range for a circuit with",
+    ]
+
+    # Only classify as classical when the message explicitly
+    # refers to a classical bit.
+    if any(pattern in m for pattern in classical_patterns):
+        return "CLASSICAL_BIT_INDEX_ERROR"
 
     # ---------------------------------------------------------
     # Qubit index / circuit size errors
@@ -39,6 +76,25 @@ def classify(message):
 
     if any(pattern in m for pattern in qubit_index_patterns):
         return "QUBIT_INDEX_ERROR"
+
+    # ---------------------------------------------------------
+    # Gate argument errors
+    # ---------------------------------------------------------
+
+    gate_argument_patterns = [
+        "expects",
+        "expected arguments",
+        "argument(s)",
+        "wrong number of arguments",
+        "incorrect number of arguments",
+        "missing required argument",
+        "too few arguments",
+        "too many arguments",
+        "amount of qubit arguments",
+    ]
+
+    if any(pattern in m for pattern in gate_argument_patterns):
+        return "GATE_ARGUMENT_ERROR"
 
     # ---------------------------------------------------------
     # Parameter errors
