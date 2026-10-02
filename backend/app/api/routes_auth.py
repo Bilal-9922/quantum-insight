@@ -621,3 +621,20 @@ def reset_password_endpoint(
             "You can now sign in."
         ),
     }
+
+@router.get("/admin/users")
+def admin_users(
+    user=Depends(admin_user),
+):
+    response = (
+        supabase
+        .table("users")
+        .select("id, name, email, created_at")
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return {
+        "success": True,
+        "users": response.data or [],
+    }   
