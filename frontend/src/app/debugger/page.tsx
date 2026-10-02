@@ -312,7 +312,7 @@ export default function Debugger() {
             </span>
           </div>
 
-          <DebugPanel data={res} />
+          <DebugPanel result={res} />
         </section>
       )}
 
