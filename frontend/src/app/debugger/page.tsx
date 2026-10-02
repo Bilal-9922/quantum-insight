@@ -15,13 +15,11 @@ export default function Debugger() {
   const { loading } = useRequireAuth();
 
   const [code, setCode] = useState(sample);
-
   const [err, setErr] = useState(
     "Qubit index error: qubit 3 is outside the circuit"
   );
 
   const [res, setRes] = useState<any>();
-
   const [busy, setBusy] = useState(false);
 
   async function run() {
@@ -40,18 +38,10 @@ export default function Debugger() {
             error?.message ||
             "Unable to communicate with the debugger service.",
         },
-        message:
-          error?.message ||
-          "Unable to communicate with the debugger service.",
       });
     } finally {
       setBusy(false);
     }
-  }
-
-  function applySuggestedFix(fixedCode: string) {
-    setCode(fixedCode);
-    setRes(undefined);
   }
 
   if (loading) {
@@ -65,17 +55,6 @@ export default function Debugger() {
     );
   }
 
-  /*
-   * ---------------------------------------------------------
-   * Unsupported / invalid code response
-   * ---------------------------------------------------------
-   *
-   * The backend returns success:false when the submitted
-   * source is not recognizable Qiskit quantum code.
-   *
-   * Do NOT send this result to DebugPanel because DebugPanel
-   * expects a normal debugger result.
-   */
   const isUnsupportedCode =
     res?.success === false &&
     res?.error?.type === "UNSUPPORTED_QUANTUM_CODE";
@@ -87,16 +66,16 @@ export default function Debugger() {
   return (
     <div className="space-y-7">
       {/* Header */}
-      <section className="relative overflow-hidden rounded-3xl border border-violet-400/10 bg-gradient-to-br from-violet-500/[.08] via-slate-950/60 to-cyan-500/[.06] p-6 shadow-[0_20px_80px_rgba(0,0,0,.15)] sm:p-8">
-        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-violet-400/10 blur-3xl" />
+      <section className="relative overflow-hidden rounded-3xl border border-cyan-400/10 bg-gradient-to-br from-cyan-500/[.07] via-slate-950/60 to-violet-500/[.06] p-6 shadow-[0_20px_80px_rgba(0,0,0,.15)] sm:p-8">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
 
         <div className="relative flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_12px_rgba(196,181,253,.8)]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,.8)]" />
 
               <p className="section-kicker">
-                Assisted debugging
+                Quantum code diagnosis
               </p>
             </div>
 
@@ -105,67 +84,53 @@ export default function Debugger() {
             </h1>
 
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              Submit your quantum circuit and the reported
-              error. QuantumInsight classifies the issue,
-              explains the cause and proposes a corrective
-              patch.
+              Analyze Qiskit code, identify quantum programming
+              errors, diagnose the problem and verify a proposed
+              correction.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-start rounded-xl border border-violet-400/10 bg-violet-400/5 px-3 py-2 lg:self-auto">
-            <span className="grid h-6 w-6 place-items-center rounded-lg bg-violet-400/10 text-violet-300">
+          <div className="flex items-center gap-2 self-start rounded-xl border border-cyan-400/10 bg-cyan-400/5 px-3 py-2 lg:self-auto">
+            <span className="grid h-6 w-6 place-items-center rounded-lg bg-cyan-400/10 text-cyan-300">
               <Icon name="bug" size={13} />
             </span>
 
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-violet-300">
-                AI-assisted
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-300">
+                Debugging engine
               </p>
 
               <p className="text-[10px] text-slate-600">
-                Diagnose · Explain · Patch
+                Detect · Diagnose · Verify
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Debug input */}
-      <section className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
-        {/* Quantum code */}
+      {/* Input */}
+      <section className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
+        {/* Code */}
         <div className="card overflow-hidden">
           <div className="border-b border-white/5 px-5 py-4 sm:px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-cyan-400/10 text-cyan-300">
-                    <Icon name="analyze" size={14} />
-                  </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-cyan-400/10 text-cyan-300">
+                  <Icon name="bug" size={14} />
+                </span>
 
-                  <p className="text-sm font-bold text-slate-200">
-                    Quantum code
-                  </p>
-                </div>
-
-                <p className="mt-1 text-[11px] text-slate-600">
-                  Paste the circuit that needs debugging.
+                <p className="text-sm font-bold text-slate-200">
+                  Quantum code
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setCode(sample);
-                  setRes(undefined);
-                }}
-                className="self-start rounded-lg border border-white/5 bg-white/[.02] px-3 py-2 text-[11px] font-bold text-cyan-300 transition hover:border-cyan-400/10 hover:bg-cyan-400/5 sm:self-auto"
-              >
-                Reset sample
-              </button>
+              <p className="mt-1 text-[11px] text-slate-600">
+                Paste the Qiskit circuit you want the AI debugger to
+                inspect.
+              </p>
             </div>
           </div>
 
-          {/* Editor toolbar */}
           <div className="flex items-center justify-between border-b border-white/5 bg-black/10 px-4 py-2">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-rose-400/60" />
@@ -180,13 +145,13 @@ export default function Debugger() {
 
           <div className="p-4 sm:p-5">
             <textarea
-              className="code-editor min-h-[320px] w-full resize-y"
+              spellCheck={false}
+              className="code-editor min-h-[300px] w-full resize-y"
               value={code}
               onChange={(e) => {
                 setCode(e.target.value);
                 setRes(undefined);
               }}
-              spellCheck={false}
               placeholder="Paste your Qiskit circuit here..."
             />
 
@@ -200,13 +165,13 @@ export default function Debugger() {
               <span className="h-1 w-1 rounded-full bg-slate-700" />
 
               <span className="text-cyan-400/60">
-                Python
+                Python / Qiskit
               </span>
             </div>
           </div>
         </div>
 
-        {/* Error message */}
+        {/* Error input */}
         <div className="card overflow-hidden">
           <div className="border-b border-white/5 px-5 py-4 sm:px-6">
             <div className="flex items-center gap-2">
@@ -214,58 +179,44 @@ export default function Debugger() {
                 <Icon name="bug" size={14} />
               </span>
 
-              <div>
-                <p className="text-sm font-bold text-slate-200">
-                  Error message
-                </p>
-
-                <p className="mt-1 text-[11px] text-slate-600">
-                  Optional — include it when available.
-                </p>
-              </div>
+              <p className="text-sm font-bold text-slate-200">
+                Reported error
+              </p>
             </div>
+
+            <p className="mt-1 text-[11px] text-slate-600">
+              Enter the error message reported by your quantum
+              program.
+            </p>
           </div>
 
           <div className="p-4 sm:p-5">
             <textarea
-              className="min-h-[250px] w-full resize-y"
+              spellCheck={false}
+              className="code-editor min-h-[180px] w-full resize-y"
               value={err}
-              onChange={(e) => setErr(e.target.value)}
-              placeholder="Paste the error message or traceback…"
+              onChange={(e) => {
+                setErr(e.target.value);
+                setRes(undefined);
+              }}
+              placeholder="Paste the Qiskit error message here..."
             />
-
-            <div className="mt-4 rounded-xl border border-amber-400/10 bg-amber-400/5 p-3">
-              <div className="flex gap-2">
-                <Icon
-                  name="spark"
-                  size={14}
-                  className="mt-0.5 shrink-0 text-amber-300"
-                />
-
-                <p className="text-xs leading-5 text-amber-200/70">
-                  Tip: include the complete traceback or
-                  compiler message when possible. If you do
-                  not have an error message, you can still
-                  submit the circuit for analysis.
-                </p>
-              </div>
-            </div>
 
             <button
               type="button"
               disabled={busy || !code.trim()}
-              className="btn btn-primary mt-4 w-full justify-center"
               onClick={run}
+              className="btn btn-primary mt-4 w-full justify-center"
             >
               {busy ? (
                 <>
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Inspecting circuit…
+                  Debugging…
                 </>
               ) : (
                 <>
-                  <Icon name="spark" size={15} />
-                  Diagnose & suggest fix
+                  <Icon name="bug" size={15} />
+                  Debug quantum code
                   <Icon name="arrow" size={15} />
                 </>
               )}
@@ -274,123 +225,101 @@ export default function Debugger() {
         </div>
       </section>
 
-      {/* Debug result */}
-      {res && (
+      {/* Unsupported quantum code */}
+      {isUnsupportedCode && (
+        <section className="rounded-2xl border border-amber-400/20 bg-amber-400/[.04] p-5 sm:p-6">
+          <div className="flex gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-400/10 text-amber-300">
+              <Icon name="shield" size={20} />
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">
+                Detection stopped
+              </p>
+
+              <h2 className="mt-1 text-lg font-bold text-white">
+                Unsupported Quantum Code
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                {res?.error?.message ||
+                  "QuantumInsight currently supports Qiskit quantum circuit code. The submitted source does not contain a recognizable quantum circuit."}
+              </p>
+
+              <div className="mt-4 rounded-xl border border-white/5 bg-black/10 px-4 py-3">
+                <p className="text-xs font-semibold text-slate-300">
+                  No debugging was performed.
+                </p>
+
+                <p className="mt-1 text-[11px] leading-5 text-slate-600">
+                  Submit a real Qiskit QuantumCircuit so the debugger
+                  can analyze the circuit and diagnose quantum
+                  programming errors.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* General error */}
+      {isGeneralError && (
+        <section className="rounded-2xl border border-rose-400/20 bg-rose-400/[.04] p-5 sm:p-6">
+          <div className="flex gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
+              <Icon name="bug" size={20} />
+            </div>
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-rose-300">
+                Debugging failed
+              </p>
+
+              <h2 className="mt-1 text-lg font-bold text-white">
+                Unable to analyze code
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                {res?.error?.message ||
+                  "The debugger service could not analyze the submitted code."}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Successful result */}
+      {res && !isUnsupportedCode && !isGeneralError && (
         <section className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_10px_rgba(196,181,253,.7)]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,.7)]" />
 
                 <p className="section-kicker">
-                  Diagnostic result
+                  Debugging complete
                 </p>
               </div>
 
               <h2 className="mt-1 text-xl font-bold text-white">
-                Debug analysis
+                Debug report
               </h2>
             </div>
 
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
-              AI Quantum Debugger
+              QuantumInsight AI debugger
             </span>
           </div>
 
-          {/* Unsupported Qiskit code */}
-          {isUnsupportedCode && (
-            <div className="overflow-hidden rounded-2xl border border-amber-400/20 bg-amber-400/[.04]">
-              <div className="border-b border-amber-400/10 bg-amber-400/[.05] px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-amber-400/10 text-amber-300">
-                    <Icon name="bug" size={17} />
-                  </span>
-
-                  <div>
-                    <p className="text-sm font-bold text-amber-200">
-                      Unsupported Quantum Code
-                    </p>
-
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-amber-300/50">
-                      Detection stopped
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5">
-                <p className="text-sm leading-6 text-slate-300">
-                  {res.error?.message ||
-                    res.message ||
-                    "The submitted source is not recognized as a valid Qiskit quantum circuit."}
-                </p>
-
-                <div className="mt-4 rounded-xl border border-white/5 bg-black/20 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                    Supported input
-                  </p>
-
-                  <p className="mt-2 text-xs leading-5 text-slate-400">
-                    AI Quantum Debugger accepts real Qiskit
-                    quantum circuit code only. Normal Python,
-                    pseudo quantum code, Java, C++, and other
-                    non-Qiskit source code cannot be analyzed.
-                  </p>
-                </div>
-
-                <div className="mt-4 flex items-center gap-2 text-xs text-amber-300/70">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                  No debugging or patch generation was performed.
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* General backend/service error */}
-          {isGeneralError && (
-            <div className="overflow-hidden rounded-2xl border border-rose-400/20 bg-rose-400/[.04]">
-              <div className="border-b border-rose-400/10 bg-rose-400/[.05] px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-rose-400/10 text-rose-300">
-                    <Icon name="bug" size={17} />
-                  </span>
-
-                  <div>
-                    <p className="text-sm font-bold text-rose-200">
-                      Debugging failed
-                    </p>
-
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.15em] text-rose-300/50">
-                      Service error
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-5">
-                <p className="text-sm leading-6 text-slate-300">
-                  {res.error?.message ||
-                    res.message ||
-                    "Unable to process the submitted code."}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Normal successful debugger result */}
-          {res?.success !== false && (
-            <DebugPanel
-              result={res}
-              onApplyFix={applySuggestedFix}
-            />
-          )}
+          <DebugPanel data={res} />
         </section>
       )}
 
       {/* Empty state */}
       {!res && !busy && (
         <div className="rounded-2xl border border-dashed border-white/5 bg-white/[.01] px-5 py-8 text-center">
-          <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-violet-400/5 text-violet-300">
+          <div className="mx-auto grid h-10 w-10 place-items-center rounded-xl bg-cyan-400/5 text-cyan-300">
             <Icon name="bug" size={18} />
           </div>
 
@@ -399,9 +328,8 @@ export default function Debugger() {
           </p>
 
           <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-700">
-            Submit your circuit with or without an error
-            message to classify the issue and generate a
-            suggested correction.
+            Submit a Qiskit circuit and an error message to identify,
+            diagnose and verify quantum programming issues.
           </p>
         </div>
       )}
