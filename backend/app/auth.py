@@ -18,8 +18,14 @@ if not JWT_SECRET:
     )
 
 JWT_ALGORITHM = "HS256"
+
 TOKEN_DAYS = 7
+
 RESET_TOKEN_MINUTES = 30
+
+EMAIL_VERIFICATION_MINUTES = 10
+
+EMAIL_VERIFICATION_MAX_ATTEMPTS = 5
 
 
 def init_auth_db():
@@ -97,6 +103,331 @@ def register_user(
         )
 
     return _user(response.data[0])
+
+
+# ============================================================
+# EMAIL VERIFICATION
+# ============================================================
+
+def create_email_verification(
+    name: str,
+    email: str,
+    password: str,
+):
+    """
+    Create a temporary email-verification record.
+
+    The actual users table is NOT modified here.
+
+    A six-digit verification code is generated and only
+    its SHA-256 hash is stored in Supabase.
+    """
+
+    name = name.strip()
+    email = email.strip().lower()
+
+    if len(name) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail="Name must contain at least 2 characters.",
+        )
+
+    if len(name) > 80:
+        raise HTTPException(
+            status_code=422,
+            detail="Name must not exceed 80 characters.",
+        )
+
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="Password must contain at least 8 characters.",
+        )
+
+    if len(password) > 128:
+        raise HTTPException(
+            status_code=422,
+            detail="Password must not exceed 128 characters.",
+        )
+
+    # Check whether an account already exists.
+    existing_user = (
+        supabase
+        .table("users")
+        .select("id")
+        .eq("email", email)
+        .limit(1)
+        .execute()
+    )
+
+    if existing_user.data:
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists.",
+        )
+
+    # Generate a cryptographically secure six-digit code.
+    verification_code = f"{secrets.randbelow(1_000_000):06d}"
+
+    verification_code_hash = hashlib.sha256(
+        verification_code.encode("utf-8")
+    ).hexdigest()
+
+    # Hash the password now so the plaintext password is
+    # never stored in the temporary verification table.
+    password_hash, salt = _hash_password(password)
+
+    now = datetime.now(timezone.utc)
+
+    expires_at = now + timedelta(
+        minutes=EMAIL_VERIFICATION_MINUTES
+    )
+
+    # Invalidate previous verification requests for this
+    # email by removing them.
+    try:
+        (
+            supabase
+            .table("email_verifications")
+            .delete()
+            .eq("email", email)
+            .execute()
+        )
+    except Exception:
+        pass
+
+    try:
+        response = (
+            supabase
+            .table("email_verifications")
+            .insert(
+                {
+                    "name": name,
+                    "email": email,
+                    "password_hash": password_hash,
+                    "salt": salt,
+                    "verification_code_hash": verification_code_hash,
+                    "expires_at": expires_at.isoformat(),
+                    "attempts": 0,
+                    "created_at": now.isoformat(),
+                }
+            )
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to start email verification.",
+        )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to start email verification.",
+        )
+
+    return {
+        "email": email,
+        "name": name,
+        "verification_code": verification_code,
+    }
+
+
+def verify_email_code(
+    email: str,
+    verification_code: str,
+):
+    """
+    Verify the six-digit email verification code.
+
+    Only after successful verification is the actual
+    users account created.
+    """
+
+    email = email.strip().lower()
+    verification_code = verification_code.strip()
+
+    if not verification_code.isdigit() or len(verification_code) != 6:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter the 6-digit verification code.",
+        )
+
+    response = (
+        supabase
+        .table("email_verifications")
+        .select("*")
+        .eq("email", email)
+        .limit(1)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No active email verification request was found. "
+                "Please request a new verification code."
+            ),
+        )
+
+    verification = response.data[0]
+
+    # Check attempt limit.
+    attempts = verification.get("attempts", 0)
+
+    if attempts >= EMAIL_VERIFICATION_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Too many incorrect verification attempts. "
+                "Please request a new verification code."
+            ),
+        )
+
+    # Check expiration.
+    expires_at = datetime.fromisoformat(
+        verification["expires_at"].replace(
+            "Z",
+            "+00:00",
+        )
+    )
+
+    if datetime.now(timezone.utc) >= expires_at:
+        (
+            supabase
+            .table("email_verifications")
+            .delete()
+            .eq("id", verification["id"])
+            .execute()
+        )
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "This verification code has expired. "
+                "Please request a new code."
+            ),
+        )
+
+    # Hash the supplied code and compare it with the stored hash.
+    supplied_hash = hashlib.sha256(
+        verification_code.encode("utf-8")
+    ).hexdigest()
+
+    if not hmac.compare_digest(
+        supplied_hash,
+        verification["verification_code_hash"],
+    ):
+        new_attempts = attempts + 1
+
+        try:
+            (
+                supabase
+                .table("email_verifications")
+                .update(
+                    {
+                        "attempts": new_attempts,
+                    }
+                )
+                .eq("id", verification["id"])
+                .execute()
+            )
+        except Exception:
+            pass
+
+        remaining = max(
+            0,
+            EMAIL_VERIFICATION_MAX_ATTEMPTS - new_attempts,
+        )
+
+        if remaining == 0:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Too many incorrect verification attempts. "
+                    "Please request a new verification code."
+                ),
+            )
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Incorrect verification code. "
+                f"{remaining} attempt(s) remaining."
+            ),
+        )
+
+    # Before creating the account, check once more that
+    # another account has not appeared for this email.
+    existing_user = (
+        supabase
+        .table("users")
+        .select("id")
+        .eq("email", email)
+        .limit(1)
+        .execute()
+    )
+
+    if existing_user.data:
+        (
+            supabase
+            .table("email_verifications")
+            .delete()
+            .eq("id", verification["id"])
+            .execute()
+        )
+
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists.",
+        )
+
+    # Create the real account only after successful verification.
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    try:
+        user_response = (
+            supabase
+            .table("users")
+            .insert(
+                {
+                    "name": verification["name"],
+                    "email": verification["email"],
+                    "password_hash": verification["password_hash"],
+                    "salt": verification["salt"],
+                    "created_at": created_at,
+                }
+            )
+            .execute()
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to create your account.",
+        )
+
+    if not user_response.data:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to create your account.",
+        )
+
+    # Verification is complete, so remove the temporary record.
+    try:
+        (
+            supabase
+            .table("email_verifications")
+            .delete()
+            .eq("id", verification["id"])
+            .execute()
+        )
+    except Exception:
+        pass
+
+    return _user(user_response.data[0])
 
 
 def authenticate(
@@ -500,6 +831,7 @@ def current_user(
         )
 
     return _user(response.data[0])
+
 
 def delete_user_account(
     user_id: int,
