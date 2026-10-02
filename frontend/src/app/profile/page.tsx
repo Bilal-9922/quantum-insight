@@ -1,10 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useRequireAuth } from "../../lib/auth";
 import { Icon } from "../../components/Icons";
 
 export default function Profile() {
   const { user, loading, logout } = useRequireAuth();
+
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   if (loading || !user) {
     return (
@@ -18,6 +24,63 @@ export default function Profile() {
   }
 
   const initial = user.name?.slice(0, 1).toUpperCase() || "U";
+
+  async function handleDeleteAccount() {
+    if (!deletePassword.trim()) {
+      setDeleteError("Please enter your password to continue.");
+      return;
+    }
+
+    setDeleteBusy(true);
+    setDeleteError("");
+
+    try {
+      const API_BASE =
+        process.env.NEXT_PUBLIC_API_URL ||
+        "https://quantuminsight-backend.onrender.com";
+
+      const token = window.localStorage.getItem("qi_token");
+
+      const response = await fetch(`${API_BASE}/api/auth/account`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {}),
+        },
+        body: JSON.stringify({
+          password: deletePassword,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail ||
+            data?.message ||
+            "Unable to delete your account. Please check your password and try again."
+        );
+      }
+
+      window.localStorage.removeItem("qi_token");
+      window.sessionStorage.clear();
+
+      await logout();
+
+      window.location.href = "/login";
+    } catch (error: any) {
+      setDeleteError(
+        error?.message ||
+          "Unable to delete your account. Please try again."
+      );
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-7">
@@ -117,6 +180,109 @@ export default function Profile() {
                 You will need to authenticate again to access
                 your QuantumInsight workspace.
               </p>
+
+              {/* Delete Account */}
+              <div className="mt-6 border-t border-white/5 pt-5">
+                <div className="rounded-2xl border border-rose-400/10 bg-rose-400/[.025] p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-400/10 text-rose-300">
+                      <Icon name="shield" size={15} />
+                    </span>
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-rose-300">
+                        Delete account
+                      </p>
+
+                      <p className="mt-1 text-[10px] leading-5 text-slate-600">
+                        Permanently delete your QuantumInsight
+                        account and associated account data.
+                      </p>
+                    </div>
+                  </div>
+
+                  {!showDeleteAccount ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDeleteAccount(true);
+                        setDeleteError("");
+                      }}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-400/15 bg-rose-400/5 px-4 py-3 text-xs font-bold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/10"
+                    >
+                      <Icon name="logout" size={14} />
+                      Delete Account
+                    </button>
+                  ) : (
+                    <div className="mt-4">
+                      <div className="rounded-xl border border-rose-400/10 bg-black/10 p-3">
+                        <p className="text-[11px] font-semibold text-rose-300">
+                          This action cannot be undone.
+                        </p>
+
+                        <p className="mt-1 text-[10px] leading-5 text-slate-600">
+                          Enter your password below to permanently
+                          delete your account.
+                        </p>
+                      </div>
+
+                      <input
+                        type="password"
+                        value={deletePassword}
+                        onChange={(event) => {
+                          setDeletePassword(event.target.value);
+                          setDeleteError("");
+                        }}
+                        placeholder="Enter your password"
+                        disabled={deleteBusy}
+                        className="mt-3 w-full rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-sm text-slate-200 outline-none transition placeholder:text-slate-700 focus:border-rose-400/30"
+                      />
+
+                      {deleteError && (
+                        <div className="mt-3 rounded-xl border border-rose-400/15 bg-rose-400/[.04] px-3 py-2">
+                          <p className="text-[10px] leading-5 text-rose-300">
+                            {deleteError}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDeleteAccount(false);
+                            setDeletePassword("");
+                            setDeleteError("");
+                          }}
+                          disabled={deleteBusy}
+                          className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[.02] px-4 py-3 text-xs font-bold text-slate-400 transition hover:border-white/15 hover:bg-white/[.04] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleDeleteAccount}
+                          disabled={deleteBusy || !deletePassword.trim()}
+                          className="flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-xs font-bold text-rose-300 transition hover:border-rose-400/30 hover:bg-rose-400/15 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {deleteBusy ? (
+                            <>
+                              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-300/30 border-t-rose-300" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Icon name="logout" size={14} />
+                              Permanently Delete
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
