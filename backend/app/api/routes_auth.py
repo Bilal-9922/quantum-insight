@@ -46,11 +46,17 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+    )
 
 
 class ChangeNameRequest(BaseModel):
-    name: str = Field(min_length=2, max_length=80)
+    name: str = Field(
+        min_length=2,
+        max_length=80,
+    )
 
 
 class ChangePasswordRequest(BaseModel):
@@ -163,6 +169,7 @@ def google_login(req: GoogleLoginRequest):
 
     if response.data:
         user = response.data[0]
+
     else:
         response = (
             supabase
@@ -277,6 +284,7 @@ def forgot_password(req: ForgotPasswordRequest):
 
     user = response.data[0]
 
+    # Create a secure, single-use password reset token.
     token = create_password_reset_token(
         user["id"]
     )
@@ -290,6 +298,7 @@ def forgot_password(req: ForgotPasswordRequest):
         f"{frontend_url}/reset-password?token={token}"
     )
 
+    # Brevo API key from Render environment variables.
     brevo_api_key = os.getenv("BREVO_API_KEY")
 
     if not brevo_api_key:
@@ -298,10 +307,11 @@ def forgot_password(req: ForgotPasswordRequest):
             detail="Email service is not configured.",
         )
 
+    # Brevo transactional email payload.
     email_payload = {
         "sender": {
             "name": "QuantumInsight",
-            "email": "onboarding@resend.dev",
+            "email": "bilalshaikh1339@gmail.com",
         },
         "to": [
             {
@@ -314,13 +324,24 @@ def forgot_password(req: ForgotPasswordRequest):
         <div style="
             font-family: Arial, sans-serif;
             max-width: 600px;
-            margin: auto;
-            padding: 20px;
+            margin: 40px auto;
+            padding: 30px;
+            background: #ffffff;
             color: #1e293b;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
         ">
-            <h2>Reset your QuantumInsight password</h2>
 
-            <p>Hello {user["name"]},</p>
+            <h2 style="
+                margin-top: 0;
+                color: #0f172a;
+            ">
+                Reset your QuantumInsight password
+            </h2>
+
+            <p>
+                Hello {user["name"]},
+            </p>
 
             <p>
                 We received a request to reset your
@@ -328,15 +349,20 @@ def forgot_password(req: ForgotPasswordRequest):
             </p>
 
             <p>
+                Click the button below to create a new password:
+            </p>
+
+            <p style="margin: 30px 0;">
                 <a
                     href="{reset_url}"
                     style="
-                        display:inline-block;
-                        padding:12px 20px;
-                        background:#2563eb;
-                        color:white;
-                        text-decoration:none;
-                        border-radius:8px;
+                        display: inline-block;
+                        padding: 12px 22px;
+                        background: #2563eb;
+                        color: #ffffff;
+                        text-decoration: none;
+                        border-radius: 8px;
+                        font-weight: 600;
                     "
                 >
                     Reset Password
@@ -344,16 +370,23 @@ def forgot_password(req: ForgotPasswordRequest):
             </p>
 
             <p>
-                This link expires in 30 minutes and can
-                only be used once.
+                This password-reset link expires in
+                <strong>30 minutes</strong> and can only
+                be used once.
             </p>
 
             <p>
-                If you did not request this, you can
-                safely ignore this email.
+                If you did not request this password reset,
+                you can safely ignore this email.
             </p>
 
-            <p>— QuantumInsight</p>
+            <p style="
+                margin-top: 30px;
+                color: #64748b;
+            ">
+                — QuantumInsight
+            </p>
+
         </div>
         """,
     }
