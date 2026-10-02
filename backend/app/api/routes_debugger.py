@@ -20,49 +20,96 @@ class DebugRequest(BaseModel):
 
 def contains_qiskit_circuit_code(code: str) -> bool:
     """
-    Detect whether the submitted source appears to be intended
-    as real Qiskit QuantumCircuit code.
+    Detect whether the submitted source contains a real
+    Qiskit QuantumCircuit reference.
 
-    This is intentionally a lightweight check.
+    Important:
+    We must NOT use simple substring matching for
+    "QuantumCircuit(" because fake classes such as:
 
-    We do NOT parse the code here because the Debugger must be
-    able to receive syntactically invalid Qiskit code and diagnose
-    the syntax error.
+        PseudoQuantumCircuit
+
+    would incorrectly match it.
+
+    The debugger intentionally uses recognition instead of
+    full parsing here so malformed Qiskit code can still reach
+    the debugger and be diagnosed as a syntax error.
     """
 
-    qiskit_markers = [
-        "from qiskit import QuantumCircuit",
-        "from qiskit import",
-        "import qiskit",
-        "QuantumCircuit(",
-        "qiskit.QuantumCircuit(",
+    import re
+
+    source = code or ""
+
+    # ---------------------------------------------------------
+    # 1. Real Qiskit imports
+    # ---------------------------------------------------------
+
+    import_patterns = [
+        r"\bfrom\s+qiskit\s+import\s+QuantumCircuit\b",
+        r"\bimport\s+qiskit\b",
+        r"\bfrom\s+qiskit\s+import\b",
     ]
 
-    return any(marker in code for marker in qiskit_markers)
+    for pattern in import_patterns:
+        if re.search(pattern, source):
+            return True
+
+    # ---------------------------------------------------------
+    # 2. Real Qiskit QuantumCircuit constructor
+    # ---------------------------------------------------------
+    #
+    # Match:
+    #
+    # QuantumCircuit(...)
+    #
+    # qiskit.QuantumCircuit(...)
+    #
+    # But DO NOT match:
+    #
+    # PseudoQuantumCircuit(...)
+    # MyQuantumCircuit(...)
+    # FakeQuantumCircuit(...)
+    #
+    constructor_patterns = [
+        r"(?<![A-Za-z0-9_])QuantumCircuit\s*\(",
+        r"\bqiskit\.QuantumCircuit\s*\(",
+    ]
+
+    for pattern in constructor_patterns:
+        if re.search(pattern, source):
+            return True
+
+    return False
 
 
 @router.post("/debug")
-def debug(req: DebugRequest, user=Depends(current_user)):
+def debug(
+    req: DebugRequest,
+    user=Depends(current_user),
+):
 
     # ---------------------------------------------------------
     # 1. Reject clearly non-Qiskit / pseudo quantum code
     # ---------------------------------------------------------
     #
-    # IMPORTANT:
-    # We only perform a lightweight recognition check here.
+    # We intentionally DO NOT call parse_qiskit_code() here.
     #
-    # We intentionally DO NOT call parse_qiskit_code().
-    #
-    # This allows malformed Qiskit code such as:
+    # The Debugger must be able to receive malformed Qiskit
+    # code such as:
     #
     #     qc.h(0
     #
-    # to reach the debugger and be diagnosed as a syntax error.
+    # and diagnose it as a syntax error.
     #
+    # Therefore, this first stage only determines whether the
+    # submitted code appears to contain real Qiskit code.
+    # ---------------------------------------------------------
+
     if not contains_qiskit_circuit_code(req.code):
+
         message = (
             "Unsupported code. QuantumInsight currently supports "
-            "valid Python code containing a Qiskit QuantumCircuit."
+            "valid Python code containing a real Qiskit QuantumCircuit."
         )
 
         return {
@@ -78,11 +125,15 @@ def debug(req: DebugRequest, user=Depends(current_user)):
     # 2. Analyze the submitted source
     # ---------------------------------------------------------
     #
-    # analyze_ast() may detect syntax problems. That information
-    # is intentionally preserved for the debugger pipeline.
+    # analyze_ast() can detect Python syntax problems.
     #
+    # This information is preserved even if the code contains
+    # a syntax error.
+    # ---------------------------------------------------------
+
     try:
         ast_result = analyze_ast(req.code)
+
     except Exception as exc:
         ast_result = {
             "success": False,
@@ -90,24 +141,42 @@ def debug(req: DebugRequest, user=Depends(current_user)):
         }
 
     # ---------------------------------------------------------
-    # 3. Run the Qiskit validation / execution check
+    # 3. Run Qiskit validation / debugging checks
     # ---------------------------------------------------------
     #
-    # This is where syntax errors and other Qiskit/Python
-    # problems should be detected.
+    # This stage detects:
     #
+    # - Syntax errors
+    # - Qubit index errors
+    # - Classical bit errors
+    # - Gate argument errors
+    # - Undefined variables
+    # - Unsupported gates
+    # - Parameter problems
+    # - Other Qiskit-related errors
+    # ---------------------------------------------------------
+
     runner_result = run_qiskit_check(req.code)
 
     detected_error = runner_result.get("error")
+
+    # Prefer an error detected directly from the Qiskit
+    # validation layer. If none was detected, fall back to
+    # the error manually supplied by the user.
     error_message = detected_error or req.error
+
     error_type = runner_result.get("error_type")
 
     # ---------------------------------------------------------
     # 4. Determine the error type
     # ---------------------------------------------------------
+
     if not error_type:
 
-        if not error_message and runner_result.get("success") is True:
+        if (
+            not error_message
+            and runner_result.get("success") is True
+        ):
             error_type = "NO_ERROR"
 
         else:
@@ -116,14 +185,16 @@ def debug(req: DebugRequest, user=Depends(current_user)):
     # ---------------------------------------------------------
     # 5. AI diagnosis
     # ---------------------------------------------------------
+
     diagnosis = diagnose(
         req.code,
         error_message,
     )
 
     # ---------------------------------------------------------
-    # 6. Generate correction
+    # 6. Generate suggested correction
     # ---------------------------------------------------------
+
     patch = generate_patch(
         req.code,
         error_message,
@@ -132,22 +203,30 @@ def debug(req: DebugRequest, user=Depends(current_user)):
     # ---------------------------------------------------------
     # 7. Verify generated correction
     # ---------------------------------------------------------
+
     verification = verify(
         patch["fixed_code"]
     )
 
     # ---------------------------------------------------------
-    # 8. Return normal debugger response
+    # 8. Return complete debugger response
     # ---------------------------------------------------------
+
     return {
         "success": True,
+
         "ast": ast_result,
+
         "runner": runner_result,
+
         "error": {
             "type": error_type,
             "message": error_message,
         },
+
         **diagnosis,
+
         **patch,
+
         **verification,
     }
