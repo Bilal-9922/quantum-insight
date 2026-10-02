@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Logo from "./Logo";
 import { Icon } from "./Icons";
 import { useAuth } from "../lib/auth";
@@ -25,6 +25,40 @@ export default function AppShell({
   const { user, loading, logout } = useAuth();
 
   const [open, setOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+  async function checkAdmin() {
+    try {
+      const token = window.localStorage.getItem("qi_token");
+
+      if (!token) {
+        return;
+      }
+
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ||
+        "https://quantuminsight-backend.onrender.com";
+
+      const response = await fetch(
+        `${API_URL}/api/admin/users`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        setIsAdmin(true);
+      }
+    } catch {
+      setIsAdmin(false);
+    }
+  }
+
+  checkAdmin();
+}, []);
 
   const authPage =
     pathname === "/login" ||
@@ -109,6 +143,41 @@ export default function AppShell({
               );
             })}
           </nav>
+          {isAdmin && (
+            <div className="mt-5">
+              <div className="mb-3 px-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">
+                Administration
+              </div>
+          
+              <Link
+                href="/admin/users"
+                onClick={() => setOpen(false)}
+                className={`side-link group ${
+                  pathname === "/admin/users"
+                    ? "active"
+                    : ""
+                }`}
+              >
+                <span
+                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition ${
+                    pathname === "/admin/users"
+                      ? "bg-cyan-400/10 text-cyan-300"
+                      : "bg-transparent text-slate-500 group-hover:bg-white/[0.04] group-hover:text-slate-300"
+                  }`}
+                >
+                  <Icon name="settings" size={17} />
+                </span>
+          
+                <span className="flex-1">
+                  User Management
+                </span>
+          
+                {pathname === "/admin/users" && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,.7)]" />
+                )}
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Spacer */}
