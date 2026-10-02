@@ -26,6 +26,12 @@ export default function SettingsPage() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  /* Delete account state */
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   async function handleNameChange(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -42,19 +48,16 @@ export default function SettingsPage() {
     setNameLoading(true);
 
     try {
-      const response = await fetch(
-        `${API}/api/auth/profile/name`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            name: trimmedName,
-          }),
-        }
-      );
+      const response = await fetch(`${API}/api/auth/profile/name`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+        }),
+      });
 
       const data = await response.json();
 
@@ -137,6 +140,53 @@ export default function SettingsPage() {
       );
     } finally {
       setPasswordLoading(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleteError("");
+
+    if (!deletePassword) {
+      setDeleteError("Please enter your current password.");
+      return;
+    }
+
+    setDeleteLoading(true);
+
+    try {
+      const response = await fetch(`${API}/api/auth/account`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          password: deletePassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail || "Unable to delete your account."
+        );
+      }
+
+      localStorage.removeItem("qi_token");
+      sessionStorage.clear();
+
+      await logout();
+
+      window.location.href = "/login";
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete your account."
+      );
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -365,6 +415,118 @@ export default function SettingsPage() {
             Log out
           </button>
         </div>
+      </section>
+
+      {/* Danger Zone */}
+      <section className="rounded-2xl border border-red-500/30 bg-red-500/[0.04] p-6 shadow-lg shadow-red-950/10">
+        <div className="mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-400/20 bg-red-400/10 text-red-300">
+              !
+            </div>
+
+            <div>
+              <h2 className="text-xl font-semibold text-red-300">
+                Danger Zone
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-400">
+                Permanent account and data actions.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {!showDeleteAccount ? (
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-white">
+                Delete Account
+              </h3>
+
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                Permanently delete your QuantumInsight account.
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeleteAccount(true);
+                setDeleteError("");
+              }}
+              className="shrink-0 rounded-xl border border-red-400/30 bg-red-500/10 px-5 py-3 text-sm font-semibold text-red-300 transition hover:bg-red-500/20"
+            >
+              Delete Account
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-red-400/20 bg-slate-950/50 p-5">
+            <h3 className="text-lg font-semibold text-white">
+              Permanently delete your account?
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              This will permanently remove your QuantumInsight
+              account. You will be signed out and will not be able
+              to recover the account after deletion.
+            </p>
+
+            <div className="mt-5">
+              <label
+                htmlFor="delete-password"
+                className="mb-2 block text-sm font-medium text-slate-300"
+              >
+                Confirm your current password
+              </label>
+
+              <input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(event) =>
+                  setDeletePassword(event.target.value)
+                }
+                maxLength={128}
+                className="w-full rounded-xl border border-red-400/20 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-red-400/50 focus:ring-2 focus:ring-red-400/10"
+                placeholder="Enter your current password"
+              />
+            </div>
+
+            {deleteError && (
+              <div className="mt-4 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-300">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteAccount(false);
+                  setDeletePassword("");
+                  setDeleteError("");
+                }}
+                disabled={deleteLoading}
+                className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading}
+                className="rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleteLoading
+                  ? "Deleting Account..."
+                  : "Yes, Delete My Account"}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </main>
   );
