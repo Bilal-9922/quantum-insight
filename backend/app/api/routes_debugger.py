@@ -9,12 +9,6 @@ from app.debugger.patch_generator import generate_patch
 from app.debugger.verifier import verify
 from app.debugger.qiskit_runner import run_qiskit_check
 
-from app.circuit.parser import (
-    parse_qiskit_code,
-    UnsupportedQuantumCodeError,
-)
-
-
 router = APIRouter(tags=["debugger"])
 
 
@@ -24,109 +18,136 @@ class DebugRequest(BaseModel):
     language: str = "python"
 
 
+def contains_qiskit_circuit_code(code: str) -> bool:
+    """
+    Detect whether the submitted source appears to be intended
+    as real Qiskit QuantumCircuit code.
+
+    This is intentionally a lightweight check.
+
+    We do NOT parse the code here because the Debugger must be
+    able to receive syntactically invalid Qiskit code and diagnose
+    the syntax error.
+    """
+
+    qiskit_markers = [
+        "from qiskit import QuantumCircuit",
+        "from qiskit import",
+        "import qiskit",
+        "QuantumCircuit(",
+        "qiskit.QuantumCircuit(",
+    ]
+
+    return any(marker in code for marker in qiskit_markers)
+
+
 @router.post("/debug")
 def debug(req: DebugRequest, user=Depends(current_user)):
 
     # ---------------------------------------------------------
-    # Validate that the submitted source is real Qiskit code
+    # 1. Reject clearly non-Qiskit / pseudo quantum code
     # ---------------------------------------------------------
+    #
+    # IMPORTANT:
+    # We only perform a lightweight recognition check here.
+    #
+    # We intentionally DO NOT call parse_qiskit_code().
+    #
+    # This allows malformed Qiskit code such as:
+    #
+    #     qc.h(0
+    #
+    # to reach the debugger and be diagnosed as a syntax error.
+    #
+    if not contains_qiskit_circuit_code(req.code):
+        message = (
+            "Unsupported code. QuantumInsight currently supports "
+            "valid Python code containing a Qiskit QuantumCircuit."
+        )
 
-    try:
-        parse_qiskit_code(req.code)
-
-    except UnsupportedQuantumCodeError as exc:
         return {
             "success": False,
             "error": {
                 "type": "UNSUPPORTED_QUANTUM_CODE",
-                "message": str(exc),
+                "message": message,
             },
-            "message": str(exc),
+            "message": message,
         }
 
     # ---------------------------------------------------------
-    # AST analysis
+    # 2. Analyze the submitted source
     # ---------------------------------------------------------
-
-    ast_result = analyze_ast(req.code)
+    #
+    # analyze_ast() may detect syntax problems. That information
+    # is intentionally preserved for the debugger pipeline.
+    #
+    try:
+        ast_result = analyze_ast(req.code)
+    except Exception as exc:
+        ast_result = {
+            "success": False,
+            "error": str(exc),
+        }
 
     # ---------------------------------------------------------
-    # Run the submitted Qiskit code through the circuit checker
+    # 3. Run the Qiskit validation / execution check
     # ---------------------------------------------------------
-
+    #
+    # This is where syntax errors and other Qiskit/Python
+    # problems should be detected.
+    #
     runner_result = run_qiskit_check(req.code)
 
-    # ---------------------------------------------------------
-    # Prefer the error detected from the submitted code.
-    # Fall back to the manually supplied error message.
-    # ---------------------------------------------------------
-
     detected_error = runner_result.get("error")
-
     error_message = detected_error or req.error
-
-    # ---------------------------------------------------------
-    # Determine error type
-    # ---------------------------------------------------------
-
     error_type = runner_result.get("error_type")
 
+    # ---------------------------------------------------------
+    # 4. Determine the error type
+    # ---------------------------------------------------------
     if not error_type:
 
-        if (
-            not error_message
-            and runner_result.get("success") is True
-        ):
+        if not error_message and runner_result.get("success") is True:
             error_type = "NO_ERROR"
 
         else:
             error_type = classify(error_message)
 
     # ---------------------------------------------------------
-    # AI diagnosis
+    # 5. AI diagnosis
     # ---------------------------------------------------------
-
     diagnosis = diagnose(
         req.code,
         error_message,
     )
 
     # ---------------------------------------------------------
-    # Generate automatic patch
+    # 6. Generate correction
     # ---------------------------------------------------------
-
     patch = generate_patch(
         req.code,
         error_message,
     )
 
     # ---------------------------------------------------------
-    # Verify the patched code
+    # 7. Verify generated correction
     # ---------------------------------------------------------
-
     verification = verify(
         patch["fixed_code"]
     )
 
     # ---------------------------------------------------------
-    # Final debugger response
+    # 8. Return normal debugger response
     # ---------------------------------------------------------
-
     return {
         "success": True,
-
         "ast": ast_result,
-
         "runner": runner_result,
-
         "error": {
             "type": error_type,
             "message": error_message,
         },
-
         **diagnosis,
-
         **patch,
-
         **verification,
     }
