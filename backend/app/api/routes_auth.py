@@ -11,6 +11,7 @@ from app.auth import (
     create_password_reset_token,
     create_token,
     current_user,
+    delete_user_account,
     init_auth_db,
     register_user,
     reset_password,
@@ -59,6 +60,12 @@ class ChangePasswordRequest(BaseModel):
     )
     new_password: str = Field(
         min_length=8,
+        max_length=128,
+    )
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(
+        min_length=1,
         max_length=128,
     )
 
@@ -222,6 +229,21 @@ def change_user_password(
     return {
         "success": True,
         "message": "Password changed successfully.",
+    }
+
+@router.delete("/auth/account")
+def delete_account(
+    req: DeleteAccountRequest,
+    user=Depends(current_user),
+):
+    delete_user_account(
+        user["id"],
+        req.password,
+    )
+
+    return {
+        "success": True,
+        "message": "Your QuantumInsight account has been permanently deleted.",
     }
 
 
