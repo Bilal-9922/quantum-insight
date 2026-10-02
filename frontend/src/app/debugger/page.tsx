@@ -312,7 +312,13 @@ export default function Debugger() {
             </span>
           </div>
 
-          <DebugPanel result={res} />
+          <DebugPanel
+            result={res}
+            onApplyFix={(fixedCode) => {
+              setCode(fixedCode);
+              setRes(undefined);
+            }}
+          />
         </section>
       )}
 
