@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.auth import (
+    admin_delete_user_account,
     admin_user,
     authenticate,
     change_password,
@@ -638,3 +639,22 @@ def admin_users(
         "success": True,
         "users": response.data or [],
     }   
+
+@router.delete("/admin/users/{user_id}")
+def admin_delete_user(
+    user_id: int,
+    admin=Depends(admin_user),
+):
+    # Prevent the administrator from deleting their own account.
+    if user_id == admin["id"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Administrators cannot delete their own account from this page.",
+        )
+
+    admin_delete_user_account(user_id)
+
+    return {
+        "success": True,
+        "message": "User account deleted successfully.",
+    }
