@@ -70,6 +70,66 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function exportUsers() {
+    try {
+      setError("");
+
+      const token = window.localStorage.getItem("qi_token");
+
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/admin/users/export`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.status === 401) {
+        router.push("/login");
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Administrator access required.");
+        return;
+      }
+
+      if (!response.ok) {
+        const message = await response.text();
+
+        throw new Error(
+          message || "Unable to export user data."
+        );
+      }
+
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "quantuminsight-users.csv";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to export user data."
+      );
+    }
+  }
+
   async function deleteUser(user: User) {
     const confirmed = window.confirm(
       `Are you sure you want to permanently delete the account for ${user.name} (${user.email})?\n\nThis action cannot be undone.`
@@ -147,14 +207,26 @@ export default function AdminUsersPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={loadUsers}
-            disabled={loading}
-            className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-cyan-500 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Export User Data */}
+            <button
+              type="button"
+              onClick={exportUsers}
+              className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-300 transition hover:border-cyan-400/40 hover:bg-cyan-400/15 hover:text-cyan-200"
+            >
+              Export User Data
+            </button>
+
+            {/* Refresh */}
+            <button
+              type="button"
+              onClick={loadUsers}
+              disabled={loading}
+              className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-cyan-500 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
         </div>
 
         {/* Error */}
@@ -286,9 +358,9 @@ export default function AdminUsersPage() {
           </div>
 
           <p className="mt-1 text-sm leading-6 text-slate-400">
-            User deletion is protected by the backend administrator
-            authorization system. Your administrator account cannot
-            be deleted from this page.
+            User deletion and data export are protected by the
+            backend administrator authorization system. Your
+            administrator account cannot be deleted from this page.
           </p>
         </div>
       </div>
