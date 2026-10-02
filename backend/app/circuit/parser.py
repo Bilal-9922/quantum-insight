@@ -59,7 +59,11 @@ def parse_qiskit_code(code: str):
     - two-qubit gates such as qc.cx(0, 1)
     - for loops using range()
     - simple arithmetic expressions such as q + 1
-    - simple Qiskit measurement/reset/barrier operations
+    - Qiskit measurement/reset/barrier operations
+
+    Important:
+    - measure(qubit, classical_bit) counts only the qubit
+    - classical-bit indices are never treated as quantum qubits
 
     Rejects:
     - C++
@@ -76,9 +80,7 @@ def parse_qiskit_code(code: str):
         )
 
     # ---------------------------------------------------------
-    # First validate that the source looks like Qiskit code.
-    # This prevents arbitrary languages or ordinary Python
-    # from becoming an empty/default quantum circuit.
+    # Validate that the source looks like Qiskit code.
     # ---------------------------------------------------------
     if not _contains_qiskit_syntax(code):
         raise UnsupportedQuantumCodeError(
@@ -114,13 +116,8 @@ def parse_qiskit_code(code: str):
         return result, "lightweight"
 
     # ---------------------------------------------------------
-    # IMPORTANT:
-    # Never silently convert unsupported code into:
-    #
-    #     {"qubits": 0, "gates": []}
-    #
-    # because downstream QHI/QMI/hardware analysis would then
-    # treat invalid source as an empty quantum circuit.
+    # Never silently convert unsupported code into an empty
+    # quantum circuit.
     # ---------------------------------------------------------
     raise UnsupportedQuantumCodeError(
         "Unsupported code. QuantumInsight currently supports "
@@ -132,7 +129,7 @@ def parse_qiskit_code(code: str):
 def _contains_qiskit_syntax(code: str):
     """
     Detect recognizable Qiskit quantum-circuit syntax without
-    executing the submitted code.
+    executing submitted code.
 
     This is intentionally conservative.
     """
@@ -163,15 +160,21 @@ def _contains_qiskit_syntax(code: str):
     # qc.h(0)
     # circuit.cx(0, 1)
     # qc.measure_all()
-    #
     gate_pattern = (
         r"\b[A-Za-z_][A-Za-z0-9_]*\."
         r"(?:" +
-        "|".join(re.escape(name) for name in GATE_NAMES) +
+        "|".join(
+            re.escape(name)
+            for name in GATE_NAMES
+        ) +
         r")\s*\("
     )
 
-    if re.search(gate_pattern, code, re.IGNORECASE):
+    if re.search(
+        gate_pattern,
+        code,
+        re.IGNORECASE,
+    ):
         return True
 
     return False
@@ -184,7 +187,10 @@ def _contains_quantum_circuit_constructor(tree):
 
     for node in ast.walk(tree):
 
-        if not isinstance(node, ast.Call):
+        if not isinstance(
+            node,
+            ast.Call,
+        ):
             continue
 
         if (
@@ -207,7 +213,10 @@ def _static_ast_parse(tree):
     # ---------------------------------------------------------
     for node in ast.walk(tree):
 
-        if isinstance(node, ast.Call):
+        if isinstance(
+            node,
+            ast.Call,
+        ):
 
             if (
                 isinstance(node.func, ast.Name)
@@ -233,7 +242,10 @@ def _static_ast_parse(tree):
         # -----------------------------------------------------
         # for i in range(...)
         # -----------------------------------------------------
-        if isinstance(node, ast.For):
+        if isinstance(
+            node,
+            ast.For,
+        ):
 
             loop_values = _range_values(
                 node.iter,
@@ -267,7 +279,10 @@ def _static_ast_parse(tree):
         # -----------------------------------------------------
         # Variable assignments
         # -----------------------------------------------------
-        if isinstance(node, ast.Assign):
+        if isinstance(
+            node,
+            ast.Assign,
+        ):
 
             value = _eval_int(
                 node.value,
@@ -290,7 +305,10 @@ def _static_ast_parse(tree):
         # -----------------------------------------------------
         # Direct function/gate calls
         # -----------------------------------------------------
-        if isinstance(node, ast.Expr):
+        if isinstance(
+            node,
+            ast.Expr,
+        ):
 
             if isinstance(
                 node.value,
@@ -385,6 +403,17 @@ def _parse_gate_call(call, env):
 
         ("h", [0])
         ("cx", [q, q + 1])
+
+    Measurement is handled specially:
+
+        qc.measure(0, 0)
+
+    becomes:
+
+        ("measure", [0])
+
+    The second value is a classical-bit index and must NOT
+    be treated as a quantum-bit index.
     """
 
     if not isinstance(
@@ -399,7 +428,32 @@ def _parse_gate_call(call, env):
         return None
 
     # ---------------------------------------------------------
-    # Operations that do not necessarily require qubit indices.
+    # Measurement.
+    #
+    # Qiskit syntax:
+    #
+    #     qc.measure(qubit, classical_bit)
+    #
+    # Only the first argument is a quantum-bit index.
+    # ---------------------------------------------------------
+    if gate == "measure":
+
+        if not call.args:
+            return None
+
+        qubit_index = _extract_qubit_index(
+            call.args[0],
+            env,
+        )
+
+        if qubit_index is None:
+            return None
+
+        return gate, [qubit_index]
+
+    # ---------------------------------------------------------
+    # Operations that do not necessarily require explicit
+    # qubit indices.
     # ---------------------------------------------------------
     if gate in {
         "measure_all",
@@ -422,7 +476,7 @@ def _parse_gate_call(call, env):
         return gate, indices
 
     # ---------------------------------------------------------
-    # Normal gate arguments.
+    # Normal quantum gate arguments.
     # ---------------------------------------------------------
     indices = []
 
@@ -472,12 +526,9 @@ def _eval_int(node, env):
         ast.Constant,
     ):
 
-        if isinstance(
-            node.value,
-            int,
-        ) and not isinstance(
-            node.value,
-            bool,
+        if (
+            isinstance(node.value, int)
+            and not isinstance(node.value, bool)
         ):
             return node.value
 
@@ -649,6 +700,9 @@ def _target_name(node):
 def lightweight_parse(code: str):
     """
     Regex fallback parser for simple Qiskit code.
+
+    Important:
+    measure(qubit, classical_bit) records only the qubit.
     """
 
     qubits = 0
@@ -709,6 +763,9 @@ def lightweight_parse(code: str):
         if gate not in GATE_NAMES:
             continue
 
+        # -----------------------------------------------------
+        # measure_all()
+        # -----------------------------------------------------
         if gate == "measure_all":
 
             gates.append(
@@ -722,13 +779,36 @@ def lightweight_parse(code: str):
 
             continue
 
-        indices = [
-            int(x)
-            for x in re.findall(
+        # -----------------------------------------------------
+        # measure(qubit, classical_bit)
+        #
+        # Only the first numeric argument represents a qubit.
+        # -----------------------------------------------------
+        if gate == "measure":
+
+            measurement_indices = re.findall(
                 r"(?<![A-Za-z_])\d+(?![A-Za-z_])",
                 args,
             )
-        ]
+
+            if not measurement_indices:
+                continue
+
+            indices = [
+                int(
+                    measurement_indices[0]
+                )
+            ]
+
+        else:
+
+            indices = [
+                int(x)
+                for x in re.findall(
+                    r"(?<![A-Za-z_])\d+(?![A-Za-z_])",
+                    args,
+                )
+            ]
 
         if indices:
 
