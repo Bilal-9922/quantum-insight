@@ -71,6 +71,10 @@ export default function Dashboard() {
 
   const [resetStatus, setResetStatus] = useState("");
 
+  // New-account greeting state
+  const [isNewAccount, setIsNewAccount] =
+    useState(false);
+
   useEffect(() => {
     if (loading || !user) return;
 
@@ -114,6 +118,21 @@ export default function Dashboard() {
     }
 
     loadHistory();
+  }, [loading, user]);
+
+  // Detect a newly registered account.
+  // The registration page sets this flag immediately
+  // before redirecting to the dashboard.
+  useEffect(() => {
+    if (loading || !user) return;
+
+    const newAccount =
+      sessionStorage.getItem("qi_new_account");
+
+    if (newAccount === "true") {
+      setIsNewAccount(true);
+      sessionStorage.removeItem("qi_new_account");
+    }
   }, [loading, user]);
 
   async function resetDashboardData() {
@@ -254,7 +273,9 @@ export default function Dashboard() {
               </div>
 
               <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[42px]">
-                Welcome back,{" "}
+                {isNewAccount
+                  ? "Welcome to QuantumInsight, "
+                  : "Welcome back, "}
                 <span className="text-cyan-300">
                   {user.name.split(" ")[0]}.
                 </span>
