@@ -42,7 +42,7 @@ export default function RegisterPage() {
     setBusy(true);
 
     try {
-      aawait register(name, email, password);
+      await register(name, email, password);
       sessionStorage.setItem("qi_new_account", "true");
       router.replace("/dashboard");
     } catch (err: any) {
