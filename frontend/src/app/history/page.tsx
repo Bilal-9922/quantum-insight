@@ -1,4 +1,3 @@
-```tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -1533,4 +1532,3 @@ function ComparisonExplanation({
     </div>
   );
 }
-```
